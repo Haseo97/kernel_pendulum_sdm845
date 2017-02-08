@@ -78,8 +78,8 @@
 #include <linux/irq.h>
 #include <linux/cpufreq_times.h>
 #include <linux/delay.h>
-
 #include <linux/kthread.h>
+#include <linux/sched/loadavg.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
