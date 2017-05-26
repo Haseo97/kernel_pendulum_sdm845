@@ -56,7 +56,6 @@ static struct rcu_ctrlblk rcu_bh_ctrlblk = {
 	.curtail	= &rcu_bh_ctrlblk.rcucblist,
 };
 
-#include "tiny_plugin.h"
 
 /*
  * Helper function for rcu_sched_qs() and rcu_bh_qs().
