@@ -56,8 +56,6 @@ struct memblock {
 
 extern struct memblock memblock;
 extern int memblock_debug;
-/* If movable_node boot option specified */
-extern bool movable_node_enabled;
 
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 #define __init_memblock __meminit
@@ -173,11 +171,6 @@ void __memblock_free_late(phys_addr_t base, phys_addr_t size);
 static inline bool memblock_is_hotpluggable(struct memblock_region *m)
 {
 	return m->flags & MEMBLOCK_HOTPLUG;
-}
-
-static inline bool __init_memblock movable_node_is_enabled(void)
-{
-	return movable_node_enabled;
 }
 
 static inline bool memblock_is_mirror(struct memblock_region *m)
