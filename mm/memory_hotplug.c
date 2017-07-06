@@ -1770,7 +1770,6 @@ static bool can_offline_normal(struct zone *zone, unsigned long nr_pages)
 
 static int __init cmdline_parse_movable_node(char *p)
 {
-#ifdef CONFIG_MOVABLE_NODE
 	/*
 	 * Memory used by the kernel cannot be hot-removed because Linux
 	 * cannot migrate the kernel pages. When memory hotplug is
@@ -1792,9 +1791,6 @@ static int __init cmdline_parse_movable_node(char *p)
 	 */
 	memblock_set_bottom_up(true);
 	movable_node_enabled = true;
-#else
-	pr_warn("movable_node option not supported\n");
-#endif
 	return 0;
 }
 early_param("movable_node", cmdline_parse_movable_node);
