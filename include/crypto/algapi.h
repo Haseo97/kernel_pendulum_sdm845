@@ -202,7 +202,7 @@ static inline unsigned int crypto_queue_len(struct crypto_queue *queue)
 }
 
 void crypto_inc(u8 *a, unsigned int size);
-void __crypto_xor(u8 *dst, const u8 *src, unsigned int size);
+void __crypto_xor(u8 *dst, const u8 *src1, const u8 *src2, unsigned int size);
 
 static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
 {
@@ -217,7 +217,7 @@ static inline void crypto_xor(u8 *dst, const u8 *src, unsigned int size)
 			size -= sizeof(unsigned long);
 		}
 	} else {
-		__crypto_xor(dst, src, size);
+		__crypto_xor(dst, dst, src, size);
 	}
 }
 
