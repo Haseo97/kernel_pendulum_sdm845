@@ -6702,10 +6702,10 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 	if (sd_flag & SD_BALANCE_FORK)
 		goto skip_spare;
 
-	if (this_spare > task_util(p) / 2 &&
+	if (this_spare > boosted_task_util(p) / 2 &&
 	    imbalance_scale*this_spare > 100*most_spare)
 		return NULL;
-	else if (most_spare > task_util(p) / 2)
+	else if (most_spare > boosted_task_util(p) / 2)
 		return most_spare_sg;
 
 skip_spare:
