@@ -270,7 +270,8 @@ void arm64_set_ssbd_mitigation(bool state);
 
 static inline bool system_supports_sve(void)
 {
-	return false;
+	return IS_ENABLED(CONFIG_ARM64_SVE) &&
+		cpus_have_const_cap(ARM64_SVE);
 }
 
 /*
