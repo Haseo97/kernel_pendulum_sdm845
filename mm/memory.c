@@ -469,6 +469,7 @@ static inline void free_pud_range(struct mmu_gather *tlb, pgd_t *pgd,
 	pud = pud_offset(pgd, start);
 	pgd_clear(pgd);
 	pud_free_tlb(tlb, pud, start);
+	mm_dec_nr_puds(tlb->mm);
 }
 
 /*
@@ -4210,6 +4211,7 @@ int __pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 	if (pgd_present(*pgd))		/* Another has populated it */
 		pud_free(mm, new);
 	else
+		mm_inc_nr_puds(mm);
 		pgd_populate(mm, pgd, new);
 	spin_unlock(&mm->page_table_lock);
 	return 0;
