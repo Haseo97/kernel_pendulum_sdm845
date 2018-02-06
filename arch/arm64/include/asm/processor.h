@@ -227,7 +227,7 @@ static inline void spin_lock_prefetch(const void *ptr)
 #endif
 
 void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused);
-int cpu_enable_uao(void *__unused);
+void cpu_enable_uao(const struct arm64_cpu_capabilities *__unused);
 void cpu_enable_cache_maint_trap(const struct arm64_cpu_capabilities *__unused);
 
 /* Userspace interface for PR_SVE_{SET,GET}_VL prctl()s: */

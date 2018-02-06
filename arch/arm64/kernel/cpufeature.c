@@ -1010,7 +1010,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.sys_reg = SYS_ID_AA64MMFR2_EL1,
 		.field_pos = ID_AA64MMFR2_UAO_SHIFT,
 		.min_field_value = 1,
-		.enable = cpu_enable_uao,
+		.cpu_enable = cpu_enable_uao,
 	},
 #endif /* CONFIG_ARM64_UAO */
 #ifdef CONFIG_ARM64_PAN
@@ -1081,7 +1081,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.field_pos = ID_AA64PFR0_SVE_SHIFT,
 		.min_field_value = ID_AA64PFR0_SVE,
 		.matches = has_cpuid_feature,
-		.enable = sve_kernel_enable,
+		.cpu_enable = sve_kernel_enable,
 	},
 #endif /* CONFIG_ARM64_SVE */
 	{},

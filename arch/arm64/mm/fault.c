@@ -809,9 +809,8 @@ void cpu_enable_pan(const struct arm64_cpu_capabilities *__unused)
  * We need to enable the feature at runtime (instead of adding it to
  * PSR_MODE_EL1h) as the feature may not be implemented by the cpu.
  */
-int cpu_enable_uao(void *__unused)
+void cpu_enable_uao(const struct arm64_cpu_capabilities *__unused)
 {
 	asm(SET_PSTATE_UAO(1));
-	return 0;
 }
 #endif /* CONFIG_ARM64_UAO */
