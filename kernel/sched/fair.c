@@ -3555,6 +3555,11 @@ static inline unsigned long _task_util_est(struct task_struct *p)
 
 static inline unsigned long task_util_est(struct task_struct *p)
 {
+#ifdef CONFIG_SCHED_WALT
+	if (likely(!walt_disabled && sysctl_sched_use_walt_task_util))
+		return (p->ravg.demand /
+			(sched_ravg_window >> SCHED_CAPACITY_SHIFT));
+#endif
 	return max(task_util(p), _task_util_est(p));
 }
 
@@ -5800,6 +5805,35 @@ static unsigned long cpu_util_wake(int cpu, struct task_struct *p)
 
 	/* Discount task's blocked util from CPU's util */
 	util -= min_t(unsigned int, util, task_util(p));
+
+	/*
+	 * Covered cases:
+	 *
+	 * a) if *p is the only task sleeping on this CPU, then:
+	 *      cpu_util (== task_util) > util_est (== 0)
+	 *    and thus we return:
+	 *      cpu_util_wake = (cpu_util - task_util) = 0
+	 *
+	 * b) if other tasks are SLEEPING on this CPU, which is now exiting
+	 *    IDLE, then:
+	 *      cpu_util >= task_util
+	 *      cpu_util > util_est (== 0)
+	 *    and thus we discount *p's blocked utilization to return:
+	 *      cpu_util_wake = (cpu_util - task_util) >= 0
+	 *
+	 * c) if other tasks are RUNNABLE on that CPU and
+	 *      util_est > cpu_util
+	 *    then we use util_est since it returns a more restrictive
+	 *    estimation of the spare capacity on that CPU, by just
+	 *    considering the expected utilization of tasks already
+	 *    runnable on that CPU.
+	 *
+	 * Cases a) and b) are covered by the above code, while case c) is
+	 * covered by the following code when estimated utilization is
+	 * enabled.
+	 */
+	if (sched_feat(UTIL_EST))
+		util = max(util, READ_ONCE(cfs_rq->avg.util_est.enqueued));
 #endif
 
 	/*
@@ -6448,7 +6482,7 @@ schedtune_task_margin(struct task_struct *p)
 	if (boost == 0)
 		return 0;
 
-	util = task_util(p);
+	util = task_util_est(p);
 	margin = schedtune_margin(util, boost);
 
 	return margin;
@@ -6484,7 +6518,7 @@ boosted_cpu_util(int cpu, struct sched_walt_cpu_load *walt_load)
 static inline unsigned long
 boosted_task_util(struct task_struct *p)
 {
-	unsigned long util = task_util(p);
+	unsigned long util = task_util_est(p);
 	long margin = schedtune_task_margin(p);
 
 	trace_sched_boost_task(p, util, margin);
@@ -7182,7 +7216,7 @@ retry:
 			 * accounting. However, the blocked utilization may be zero.
 			 */
 			wake_util = cpu_util_wake(i, p);
-			new_util = wake_util + task_util(p);
+			new_util = wake_util + task_util_est(p);
 			spare_cap = capacity_orig_of(i) - wake_util;
 
 			if (spare_cap > most_spare_cap) {
