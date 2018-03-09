@@ -4911,7 +4911,6 @@ static inline void hrtick_update(struct rq *rq)
 
 #ifdef CONFIG_SMP
 static unsigned long capacity_orig_of(int cpu);
-static unsigned long cpu_util(int cpu);
 #endif
 
 /*
@@ -5656,7 +5655,49 @@ struct energy_env {
 	struct sched_group	*sg;
 };
 
-static int cpu_util_wake(int cpu, struct task_struct *p);
+/*
+ * cpu_util_wake: Compute CPU utilization with any contributions from
+ * the waking task p removed.
+ */
+static unsigned long cpu_util_wake(int cpu, struct task_struct *p)
+{
+	unsigned int util;
+
+#ifdef CONFIG_SCHED_WALT
+	/*
+	 * WALT does not decay idle tasks in the same manner
+	 * as PELT, so it makes little sense to subtract task
+	 * utilization from cpu utilization. Instead just use
+	 * cpu_util for this case.
+	 */
+	if (likely(!walt_disabled && sysctl_sched_use_walt_cpu_util) &&
+						p->state == TASK_WAKING)
+		return cpu_util(cpu);
+#endif
+
+	/* Task has no contribution or is new */
+	if (cpu != task_cpu(p) || !READ_ONCE(p->se.avg.last_update_time))
+		return cpu_util(cpu);
+
+#ifdef CONFIG_SCHED_WALT
+	util = max_t(long, cpu_util(cpu) - task_util(p), 0);
+#else
+	struct cfs_rq *cfs_rq;
+
+	cfs_rq = &cpu_rq(cpu)->cfs;
+	util = READ_ONCE(cfs_rq->avg.util_avg);
+
+	/* Discount task's blocked util from CPU's util */
+	util -= min_t(unsigned int, util, task_util(p));
+#endif
+
+	/*
+	 * Utilization (estimated) can exceed the CPU capacity, thus let's
+	 * clamp to the maximum CPU capacity to ensure consistency with
+	 * the cpu_util call.
+	 */
+	return min_t(unsigned long, util, capacity_orig_of(cpu));
+}
 
 /*
  * __cpu_norm_util() returns the cpu util relative to a specific capacity,
@@ -6857,37 +6898,6 @@ done:
 	schedstat_inc(this_rq()->eas_stats.sis_count);
 
 	return target;
-}
- 
-/*
- * cpu_util_wake: Compute cpu utilization with any contributions from
- * the waking task p removed.  check_for_migration() looks for a better CPU of
- * rq->curr. For that case we should return cpu util with contributions from
- * currently running task p removed.
- */
-static int cpu_util_wake(int cpu, struct task_struct *p)
-{
-	unsigned long util, capacity;
-
-#ifdef CONFIG_SCHED_WALT
-	/*
-	 * WALT does not decay idle tasks in the same manner
-	 * as PELT, so it makes little sense to subtract task
-	 * utilization from cpu utilization. Instead just use
-	 * cpu_util for this case.
-	 */
-	if (!walt_disabled && sysctl_sched_use_walt_cpu_util &&
-	    p->state == TASK_WAKING)
-		return cpu_util(cpu);
-#endif
-	/* Task has no contribution or is new */
-	if (cpu != task_cpu(p) || !p->se.avg.last_update_time)
-		return cpu_util(cpu);
-
-	capacity = capacity_orig_of(cpu);
-	util = max_t(long, cpu_util(cpu) - task_util(p), 0);
-
-	return (util >= capacity) ? capacity : util;
 }
 
 struct find_best_target_env {
