@@ -11,6 +11,7 @@
 
 #include <linux/proc_fs.h>
 #include <linux/proc_ns.h>
+#include <linux/refcount.h>
 #include <linux/spinlock.h>
 #include <linux/atomic.h>
 #include <linux/binfmts.h>
@@ -41,7 +42,7 @@ struct proc_dir_entry {
 	struct rb_root subdir;
 	struct rb_node subdir_node;
 	void *data;
-	atomic_t count;		/* use count */
+	refcount_t refcnt;
 	atomic_t in_use;	/* number of callers into module in progress; */
 			/* negative -> it's going away RSN */
 	struct completion *pde_unload_completion;
@@ -187,7 +188,7 @@ extern int proc_readdir_de(struct proc_dir_entry *, struct file *, struct dir_co
 
 static inline struct proc_dir_entry *pde_get(struct proc_dir_entry *pde)
 {
-	atomic_inc(&pde->count);
+	refcount_inc(&pde->refcnt);
 	return pde;
 }
 extern void pde_put(struct proc_dir_entry *);
