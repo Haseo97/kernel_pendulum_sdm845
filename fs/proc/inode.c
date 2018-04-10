@@ -333,7 +333,7 @@ static int proc_reg_open(struct inode *inode, struct file *file)
 
 	release = pde->proc_fops->release;
 	if (release) {
-		pdeo = kmalloc(sizeof(struct pde_opener), GFP_KERNEL);
+		pdeo = kzalloc(sizeof(struct pde_opener), GFP_KERNEL);
 		if (!pdeo) {
 			rv = -ENOMEM;
 			goto out_unuse;
