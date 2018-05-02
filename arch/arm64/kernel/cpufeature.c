@@ -30,6 +30,7 @@
 #include <asm/fpsimd.h>
 #include <asm/mmu_context.h>
 #include <asm/processor.h>
+#include <asm/scs.h>
 #include <asm/sysreg.h>
 #include <asm/traps.h>
 #include <asm/virt.h>
@@ -898,9 +899,13 @@ static int __nocfi kpti_install_ng_mappings(void *__unused)
 
 	remap_fn = (void *)__pa_symbol(idmap_kpti_install_ng_mappings);
 
+	scs_save(current);
+
 	cpu_install_idmap();
 	remap_fn(cpu, num_online_cpus(), __pa_symbol(swapper_pg_dir));
 	cpu_uninstall_idmap();
+
+	scs_load(current);
 
 	if (!cpu)
 		kpti_applied = true;
