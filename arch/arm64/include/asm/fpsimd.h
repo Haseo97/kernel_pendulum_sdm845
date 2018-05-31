@@ -132,6 +132,18 @@ static inline void sve_setup(void) { }
 
 #endif /* ! CONFIG_ARM64_SVE */
 
+#ifdef CONFIG_ENABLE_FP_SIMD_SETTINGS
+extern void fpsimd_disable_trap(void);
+extern void fpsimd_enable_trap(void);
+extern void fpsimd_settings_disable(void);
+extern void fpsimd_settings_enable(void);
+#else
+static inline void fpsimd_disable_trap(void) {}
+static inline void fpsimd_enable_trap(void) {}
+static inline void fpsimd_settings_disable(void) {}
+static inline void fpsimd_settings_enable(void) {}
+#endif
+
 #endif
 
 #endif
