@@ -41,6 +41,8 @@
 #define ARM64_HAS_DCPOP				20
 #define ARM64_SVE				21
 
-#define ARM64_NCAPS				22
+#define ARM64_HAS_CRC32				22
+
+#define ARM64_NCAPS				23
 
 #endif /* __ASM_CPUCAPS_H */
