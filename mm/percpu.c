@@ -750,6 +750,7 @@ static void pcpu_free_chunk(struct pcpu_chunk *chunk)
 	if (!chunk)
 		return;
 	pcpu_mem_free(chunk->map);
+	pcpu_mem_free(chunk->md_blocks);
 	pcpu_mem_free(chunk);
 }
 
