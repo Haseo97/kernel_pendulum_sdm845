@@ -142,6 +142,7 @@ static void _sched_set_boost(int type)
 	case NO_BOOST: /* All boost clear */
 		if (boost_refcount[FULL_THROTTLE_BOOST] > 0) {
 			core_ctl_set_boost(false);
+			walt_enable_frequency_aggregation(false);
 			boost_refcount[FULL_THROTTLE_BOOST] = 0;
 		}
 		if (boost_refcount[CONSERVATIVE_BOOST] > 0) {
@@ -160,6 +161,8 @@ static void _sched_set_boost(int type)
 			core_ctl_set_boost(true);
 			restore_cgroup_boost_settings();
 			boost_kick_cpus();
+			if (!boost_refcount[RESTRAINED_BOOST])
+				walt_enable_frequency_aggregation(true);
 		}
 		break;
 
@@ -174,7 +177,8 @@ static void _sched_set_boost(int type)
 
 	case RESTRAINED_BOOST:
 	    boost_refcount[RESTRAINED_BOOST]++;
-		if (boost_refcount[RESTRAINED_BOOST] == 1)
+		if (boost_refcount[RESTRAINED_BOOST] == 1 &&
+		    !boost_refcount[FULL_THROTTLE_BOOST])
 			walt_enable_frequency_aggregation(true);
 		break;
 
@@ -185,6 +189,9 @@ static void _sched_set_boost(int type)
 				core_ctl_set_boost(false);
 				if (boost_refcount[CONSERVATIVE_BOOST] >= 1)
 					update_cgroup_boost_settings();
+				if (!boost_refcount[RESTRAINED_BOOST])
+					walt_enable_frequency_aggregation(
+								false);
 			}
 		}
 		break;
@@ -200,7 +207,8 @@ static void _sched_set_boost(int type)
 	case RESTRAINED_BOOST_DISABLE:
 		if (boost_refcount[RESTRAINED_BOOST] >= 1) {
 			boost_refcount[RESTRAINED_BOOST]--;
-			if (!boost_refcount[RESTRAINED_BOOST])
+			if (!boost_refcount[RESTRAINED_BOOST] &&
+			    !boost_refcount[FULL_THROTTLE_BOOST])
 				walt_enable_frequency_aggregation(false);
 		}
 		break;
