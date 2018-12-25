@@ -634,6 +634,8 @@ static int cpuhp_up_callbacks(unsigned int cpu, struct cpuhp_cpu_state *st,
 				st->target = prev_state;
 				undo_cpu_up(cpu, st);
 			}
+			st->target = prev_state;
+			undo_cpu_up(cpu, st);
 			break;
 		}
 	}

@@ -2267,6 +2267,9 @@ struct timespec64 get_monotonic_coarse64(void)
 	return now;
 }
 EXPORT_SYMBOL(get_monotonic_coarse64);
+#ifdef CONFIG_PACKAGE_RUNTIME_INFO
+void __weak package_runtime_monitor(u64 now) {}
+#endif
 
 /*
  * Must hold jiffies_lock
@@ -2274,6 +2277,9 @@ EXPORT_SYMBOL(get_monotonic_coarse64);
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;
+#ifdef CONFIG_PACKAGE_RUNTIME_INFO
+	package_runtime_monitor(jiffies_64);
+#endif
 	calc_global_load(ticks);
 }
 

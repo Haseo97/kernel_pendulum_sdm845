@@ -440,6 +440,8 @@ static int __qseecom_scm_call2_locked(uint32_t smc_id, struct scm_desc *desc)
 	return ret;
 }
 
+extern void read_qseelog_wakeup(void);
+
 static int qseecom_scm_call2(uint32_t svc_id, uint32_t tz_cmd_id,
 			const void *req_buf, void *resp_buf)
 {
@@ -1097,6 +1099,8 @@ static int qseecom_scm_call2(uint32_t svc_id, uint32_t tz_cmd_id,
 		svc_id, tz_cmd_id, qseos_cmd_id, smc_id, desc.arginfo);
 	pr_debug("scm_resp->result = 0x%x, scm_resp->resp_type = 0x%x, scm_resp->data = 0x%x\n",
 		scm_resp->result, scm_resp->resp_type, scm_resp->data);
+
+	read_qseelog_wakeup();
 	return ret;
 }
 
