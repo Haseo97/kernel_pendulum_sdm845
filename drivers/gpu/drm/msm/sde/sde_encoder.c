@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2018 XiaoMi, Inc.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
  *
@@ -2867,7 +2868,6 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 		input_unregister_handler(sde_enc->input_handler);
 		sde_enc->input_handler_registered = false;
 	}
-
 
 	/* wait for idle */
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
