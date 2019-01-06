@@ -4951,6 +4951,7 @@ static void mxt_switch_mode_work(struct work_struct *work)
 	const struct mxt_platform_data *pdata = data->pdata;
 	int index = data->current_index;
 	u8 value = ms->mode;
+
 	if (value == MXT_INPUT_EVENT_STYLUS_MODE_ON ||
 				value == MXT_INPUT_EVENT_STYLUS_MODE_OFF)
 		mxt_stylus_mode_switch(data, (bool)(value - MXT_INPUT_EVENT_STYLUS_MODE_OFF));
