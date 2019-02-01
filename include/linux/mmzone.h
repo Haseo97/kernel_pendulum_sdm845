@@ -180,6 +180,14 @@ enum node_stat_item {
 	NR_DIRTIED,		/* page dirtyings since bootup */
 	NR_WRITTEN,		/* page writings since bootup */
 	NR_INDIRECTLY_RECLAIMABLE_BYTES, /* measured in bytes */
+	/*
+	 * NR_ION_HEAP covers every allocation from ION heap system heap.
+	 * It means it already includes NR_INDIRECTLY_RECLAIMABLE_BYTES.
+	 * Therefore, the amount of ION heap application using at this moment
+	 * is NR_ION_HEAP - (NR_INDIRECTLY_RECLAIMABLE_BYTES / PAGE_SIZE).
+	 */
+	NR_ION_HEAP,
+	NR_GPU_HEAP,
 	NR_VM_NODE_STAT_ITEMS
 };
 
