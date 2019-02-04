@@ -46,10 +46,6 @@
 			qcom,mdss-pan-physical-height-dimension = < 0x8d >;
 			qcom,cont-splash-enabled;
 			qcom,mdss-dsi-tx-eot-append;
-			qcom,mdss-dsi-panel-hdr-enabled;
-			qcom,mdss-dsi-panel-hdr-color-primaries = < 0x38a4 0x3c8c 0x7d00 0x4268 0x3c8c 0x7530 0x1f40 0xbb8 >;
-			qcom,mdss-dsi-panel-peak-brightness = < 0x401640 >;
-			qcom,mdss-dsi-panel-blackness-level = < 0xc9e >;
 			qcom,dispparam-enabled;
 			qcom,mdss-panel-on-dimming-delay = < 0x78 >;
 			qcom,mdss-dsi-t-clk-post = < 0x0e >;
