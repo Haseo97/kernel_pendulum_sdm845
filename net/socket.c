@@ -610,6 +610,7 @@ void sock_release(struct socket *sock)
 		struct module *owner = sock->ops->owner;
 
 		sock->ops->release(sock);
+		sock->sk = NULL;
 		sock->ops = NULL;
 		module_put(owner);
 	}
