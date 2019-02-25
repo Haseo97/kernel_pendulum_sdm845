@@ -32,6 +32,10 @@
 #include <drm/drm_notifier.h>
 #include <soc/qcom/socinfo.h>
 
+#ifdef CONFIG_KLAPSE
+#include "../sde/klapse.h"
+#endif
+
 #define DSI_READ_WRITE_PANEL_DEBUG 1
 #if DSI_READ_WRITE_PANEL_DEBUG
 #include <linux/proc_fs.h>
@@ -964,7 +968,15 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 		rc = -ENOTSUPP;
 	}
 
+<<<<<<< HEAD
 	if ((panel->last_bl_lvl == 0 || (panel->skip_dimmingon & STATE_DIM_RESTORE)) && bl_lvl) {
+=======
+#ifdef CONFIG_KLAPSE
+	set_rgb_slider(bl_lvl);
+#endif
+
+	if ((panel->last_bl_lvl == 0 || (panel->skip_dimmingon == STATE_DIM_RESTORE)) && bl_lvl) {
+>>>>>>> cb43f5b45ae0... drm/msm: Introduce KLapse RGB scaling module
 		if (panel->panel_on_dimming_delay)
 			schedule_delayed_work(&panel->cmds_work,
 				msecs_to_jiffies(panel->panel_on_dimming_delay));
