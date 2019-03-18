@@ -28,8 +28,7 @@ static inline void fscrypt_enqueue_decrypt_work(struct work_struct *work)
 {
 }
 
-static inline struct fscrypt_ctx *fscrypt_get_ctx(const struct inode *inode,
-						  gfp_t gfp_flags)
+static inline struct fscrypt_ctx *fscrypt_get_ctx(gfp_t gfp_flags)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }
