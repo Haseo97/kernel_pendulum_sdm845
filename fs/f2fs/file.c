@@ -230,8 +230,7 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 	clear_inode_flag(inode, FI_NEED_IPU);
 
 	if (ret) {
-		f2fs_msg(sbi->sb, KERN_WARNING,
-			"filemap_write failed %d dsync=%d atomic=%d",
+		f2fs_info(sbi, "filemap_write failed %d dsync=%d atomic=%d",
 			ret, datasync, atomic);
 		trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
 		return ret;
@@ -271,8 +270,7 @@ go_write:
 		/* all the dirty node pages should be flushed for POR */
 		ret = f2fs_sync_fs(inode->i_sb, 1);
 		if (ret)
-			f2fs_msg(sbi->sb, KERN_WARNING,
-				"f2fs_sync_fs failed %d dsync=%d atomic=%d",
+			f2fs_info(sbi, "f2fs_sync_fs failed %d dsync=%d atomic=%d",
 				ret, datasync, atomic);
 
 		/*
@@ -289,8 +287,7 @@ sync_nodes:
 	ret = f2fs_fsync_node_pages(sbi, inode, &wbc, atomic, &seq_id);
 	atomic_dec(&sbi->wb_sync_req[NODE]);
 	if (ret) {
-		f2fs_msg(sbi->sb, KERN_WARNING,
-				"fsync_node_pages failed %d dsync=%d atomic=%d",
+		f2fs_info(sbi, "fsync_node_pages failed %d dsync=%d atomic=%d",
 				ret, datasync, atomic);
 		goto out;
 	}
@@ -318,8 +315,7 @@ sync_nodes:
 	if (!atomic) {
 		ret = f2fs_wait_on_node_pages_writeback(sbi, seq_id);
 		if (ret) {
-			f2fs_msg(sbi->sb, KERN_WARNING,
-				"wait_on_node failed %d dsync=%d atomic=%d",
+			f2fs_info(sbi, "wait_on_node failed %d dsync=%d atomic=%d",
 				ret, datasync, atomic);
 			goto out;
 		}
@@ -332,8 +328,7 @@ flush_out:
 	if (!atomic && F2FS_OPTION(sbi).fsync_mode != FSYNC_MODE_NOBARRIER) {
 		ret = f2fs_issue_flush(sbi, inode->i_ino);
 		if (ret)
-			f2fs_msg(sbi->sb, KERN_WARNING,
-				"f2fs_issue_flush failed %d dsync=%d atomic=%d",
+			f2fs_info(sbi, "f2fs_issue_flush failed %d dsync=%d atomic=%d",
 				ret, datasync, atomic);
 	}
 	if (!ret) {
@@ -2888,12 +2883,11 @@ static int f2fs_ioc_enable_verity(struct file *filp, unsigned long arg)
 
 	f2fs_update_time(F2FS_I_SB(inode), REQ_TIME);
 
-	if (!f2fs_sb_has_verity(F2FS_I_SB(inode))) {
-		f2fs_msg(inode->i_sb, KERN_WARNING,
-			 "Can't enable fs-verity on inode %lu: the fs-verity feature is disabled on this filesystem.\n",
+/*	if (!f2fs_sb_has_verity(F2FS_I_SB(inode))) {
+		f2fs_info(inode, "Can't enable fs-verity on inode %lu: the fs-verity feature is disabled on this filesystem.\n",
 			 inode->i_ino);
 		return -EOPNOTSUPP;
-	}
+	} */
 
 	return fsverity_ioctl_enable(filp, (const void __user *)arg);
 }

@@ -48,7 +48,7 @@ struct fscrypt_ctx {
 
 static inline bool fscrypt_has_encryption_key(const struct inode *inode)
 {
-	return READ_ONCE(inode->i_crypt_info != NULL);
+	return READ_ONCE(inode->i_crypt_info) != NULL;
 }
 
 static inline bool fscrypt_dummy_context_enabled(struct inode *inode)
@@ -84,7 +84,7 @@ static inline void fscrypt_set_d_op(struct dentry *dentry)
 static inline void fscrypt_set_encrypted_dentry(struct dentry *dentry)
 {
 	spin_lock(&dentry->d_lock);
-	dentry->d_flags |= DCACHE_ENCRYPTED_WITH_KEY;
+	dentry->d_flags |= DCACHE_ENCRYPTED_NAME;
 	spin_unlock(&dentry->d_lock);
 }
 
@@ -97,6 +97,7 @@ extern int fscrypt_inherit_context(struct inode *, struct inode *,
 /* keyinfo.c */
 extern int fscrypt_get_encryption_info(struct inode *);
 extern void fscrypt_put_encryption_info(struct inode *);
+extern void fscrypt_free_inode(struct inode *);
 
 /* fname.c */
 extern int fscrypt_setup_filename(struct inode *, const struct qstr *,

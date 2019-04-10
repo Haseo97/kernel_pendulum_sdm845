@@ -2384,9 +2384,7 @@ continue_unlock:
 					}
 					continue;
 				} else {
-					f2fs_msg(F2FS_M_SB(mapping)->sb,
-						KERN_WARNING,
-						"__write_data_page failed %d "
+					f2fs_warn(F2FS_M_SB(mapping), "__write_data_page failed %d "
 						"mode=%d type=%d index=%lu",
 						ret, wbc->sync_mode,
 						io_type, page->index);
