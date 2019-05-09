@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -402,7 +403,9 @@ static int wdsp_download_segments(struct wdsp_mgr_priv *wdsp,
 
 	ret = wdsp_get_segment_list(ctl->cdev, wdsp->img_fname,
 				    type, wdsp->seg_list, &wdsp->base_addr);
+
 	pr_info("%s: downloading wdsp firmware: %s.\n", __func__, wdsp->img_fname);
+
 	if (ret < 0 ||
 	    list_empty(wdsp->seg_list)) {
 		WDSP_ERR(wdsp, "Error %d to get image segments for type %d",
@@ -803,6 +806,7 @@ static int wdsp_ssr_handler(struct wdsp_mgr_priv *wdsp, void *arg,
 		__wdsp_clr_ready_locked(wdsp, WDSP_SSR_STATUS_WDSP_READY);
 		wdsp_broadcast_event_downseq(wdsp, WDSP_EVENT_PRE_SHUTDOWN,
 					     NULL);
+		reinit_completion(&wdsp->ready_compl);
 		schedule_work(&wdsp->ssr_work);
 		break;
 
@@ -819,7 +823,7 @@ static int wdsp_ssr_handler(struct wdsp_mgr_priv *wdsp, void *arg,
 						     WDSP_EVENT_PRE_SHUTDOWN,
 						     NULL);
 		}
-
+		reinit_completion(&wdsp->ready_compl);
 		schedule_work(&wdsp->ssr_work);
 		break;
 
@@ -1200,12 +1204,9 @@ static int wdsp_mgr_parse_dt_entries(struct wdsp_mgr_priv *wdsp)
 
 	ret = of_property_read_string(dev->of_node, "qcom,img-filename",
 				      &wdsp->img_fname);
-#ifdef MIUI_CUST_GLOBAL
-	wdsp->img_fname  = "cpe_intl";
+
+	wdsp->img_fname = "cpe_intl";
 	pr_info("%s: using global wdsp fw: %s.\n", __func__, wdsp->img_fname);
-#else
-	pr_info("%s: using non-global wdsp fw: %s.\n", __func__, wdsp->img_fname);
-#endif
 
 	if (ret < 0) {
 		WDSP_ERR(wdsp, "Reading property %s failed, error = %d",
