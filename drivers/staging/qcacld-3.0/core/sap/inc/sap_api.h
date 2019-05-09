@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -515,6 +515,7 @@ struct sap_acs_cfg {
 	uint8_t    ht_sec_ch;
 	uint8_t    vht_seg0_center_ch;
 	uint8_t    vht_seg1_center_ch;
+	bool dfs_master_enable;
 };
 
 /*
@@ -1044,6 +1045,16 @@ void wlansap_cleanup_cac_timer(void *sap_ctx);
  * Return: None
  */
 void wlansap_set_stop_bss_inprogress(void *ctx, bool in_progress);
+
+/**
+ * wlansap_check_sap_started() - Get SAP started state
+ * @sap_ctx: sap context
+ *
+ * This api returns the current SAP started state to the caller.
+ *
+ * Return: true if SAP is started state else return false
+ */
+bool wlansap_check_sap_started(void *sap_ctx);
 
 #ifdef __cplusplus
 }

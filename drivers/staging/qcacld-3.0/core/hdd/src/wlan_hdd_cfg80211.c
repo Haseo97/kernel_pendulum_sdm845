@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -173,6 +173,8 @@
  * Count to ratelimit the HDD logs during NL parsing
  */
 #define HDD_NL_ERR_RATE_LIMIT 5
+
+#define CSA_COMPLETE_TIMEOUT_VALUE 10000
 
 static const u32 hdd_gcmp_cipher_suits[] = {
 	WLAN_CIPHER_SUITE_GCMP,
@@ -1725,6 +1727,13 @@ static int __wlan_hdd_cfg80211_do_acs(struct wiphy *wiphy,
 	else
 		sap_config->acs_cfg.ch_width = CH_WIDTH_20MHZ;
 
+	/*
+	 * Update dfs master capability info in acs cfg, used to exclude
+	 * the dfs channels from acs scan list, in API sap_get_channel_list
+	 */
+	sap_config->acs_cfg.dfs_master_enable =
+				hdd_ctx->config->enableDFSMasterCap;
+
 	/* hw_mode = a/b/g: QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST and
 	 * QCA_WLAN_VENDOR_ATTR_ACS_FREQ_LIST attrs are present, and
 	 * QCA_WLAN_VENDOR_ATTR_ACS_CH_LIST is used for obtaining the
@@ -2138,8 +2147,9 @@ __wlan_hdd_cfg80211_get_supported_features(struct wiphy *wiphy,
 		hdd_debug("NAN is supported by firmware");
 		fset |= WIFI_FEATURE_NAN;
 	}
-	if (sme_is_feature_supported_by_fw(RTT)) {
-		hdd_debug("RTT is supported by firmware");
+	if (sme_is_feature_supported_by_fw(RTT) &&
+	    pHddCtx->config->enable_rtt_support) {
+		hdd_debug("RTT is supported by firmware and framework");
 		fset |= WIFI_FEATURE_D2D_RTT;
 		fset |= WIFI_FEATURE_D2AP_RTT;
 	}
@@ -4958,6 +4968,8 @@ static int __wlan_hdd_cfg80211_keymgmt_set_key(struct wiphy *wiphy,
 	qdf_mem_copy(local_pmk, data, data_len);
 	sme_roam_set_psk_pmk(WLAN_HDD_GET_HAL_CTX(hdd_adapter_ptr),
 			hdd_adapter_ptr->sessionId, local_pmk, data_len);
+	qdf_mem_zero(&local_pmk, SIR_ROAM_SCAN_PSK_SIZE);
+
 	return 0;
 }
 
@@ -9270,6 +9282,8 @@ static int hdd_validate_avoid_freq_chanlist(hdd_context_t *hdd_ctx,
 		for (ch_idx = channel_list->avoidFreqRange[range_idx].startFreq;
 		     ch_idx <= channel_list->avoidFreqRange[range_idx].endFreq;
 		     ch_idx++) {
+			 if (INVALID_CHANNEL == cds_get_channel_enum(ch_idx))
+				continue;
 			for (unsafe_channel_index = 0;
 			     unsafe_channel_index < unsafe_channel_count;
 			     unsafe_channel_index++) {
@@ -9462,6 +9476,7 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 	struct net_device *ndev = wdev->netdev;
 	hdd_adapter_t *hostapd_adapter = WLAN_HDD_GET_PRIV_PTR(ndev);
 	hdd_context_t *hdd_ctx = wiphy_priv(wiphy);
+	hdd_hostapd_state_t *hostapd_state;
 	struct nlattr *tb[QCA_WLAN_VENDOR_ATTR_SAP_CONFIG_MAX + 1];
 	uint8_t config_channel = 0;
 	hdd_ap_ctx_t *ap_ctx;
@@ -9504,15 +9519,30 @@ __wlan_hdd_cfg80211_sap_configuration_set(struct wiphy *wiphy,
 
 		ap_ctx = WLAN_HDD_GET_AP_CTX_PTR(hostapd_adapter);
 		ap_ctx->sapConfig.channel = config_channel;
-		ap_ctx->sapConfig.ch_params.ch_width =
-					ap_ctx->sapConfig.ch_width_orig;
-		ap_ctx->bss_stop_reason = BSS_STOP_DUE_TO_VENDOR_CONFIG_CHAN;
+		ap_ctx->sapConfig.ch_params.ch_width = CH_WIDTH_MAX;
+		hdd_debug("config chan:%d, orig width:%d",
+			   config_channel, ap_ctx->sapConfig.ch_width_orig);
 
 		cds_set_channel_params(ap_ctx->sapConfig.channel,
 				ap_ctx->sapConfig.sec_ch,
 				&ap_ctx->sapConfig.ch_params);
 
-		cds_restart_sap(hostapd_adapter);
+		hostapd_state = WLAN_HDD_GET_HOSTAP_STATE_PTR(hostapd_adapter);
+		qdf_event_reset(&hostapd_state->qdf_event);
+		ret = hdd_softap_set_channel_change(hostapd_adapter->dev,
+						    config_channel,
+						    CH_WIDTH_MAX);
+		if (ret) {
+			hdd_err("Set channel with CSA failed!");
+			return -EINVAL;
+		}
+		status =
+		qdf_wait_for_event_completion(&hostapd_state->qdf_event,
+					      CSA_COMPLETE_TIMEOUT_VALUE);
+		if (!QDF_IS_STATUS_SUCCESS(status)) {
+			hdd_err("Wait for qdf_event failed!");
+			return -EINVAL;
+		}
 	}
 
 	if (tb[QCA_WLAN_VENDOR_ATTR_SAP_MANDATORY_FREQUENCY_LIST]) {
@@ -10888,10 +10918,16 @@ static inline uint8_t *hdd_dns_unmake_name_query(uint8_t *name)
  *
  * Return: Byte following constructed DNS name
  */
-static uint8_t *hdd_dns_make_name_query(const uint8_t *string, uint8_t *buf)
+static uint8_t *hdd_dns_make_name_query(const uint8_t *string,
+					uint8_t *buf, uint8_t len)
 {
 	uint8_t *length_byte = buf++;
 	uint8_t c;
+
+	if (string[len - 1]) {
+		hdd_debug("DNS name is not null terminated");
+		return NULL;
+	}
 
 	while ((c = *(string++))) {
 		if (c == '.') {
@@ -10981,8 +11017,12 @@ static int hdd_set_clear_connectivity_check_stats_info(
 					adapter->track_dns_domain_len =
 						nla_len(tb2[
 							STATS_DNS_DOMAIN_NAME]);
-					hdd_dns_make_name_query(domain_name,
-							adapter->dns_payload);
+					if (!hdd_dns_make_name_query(
+						domain_name,
+						adapter->dns_payload,
+						adapter->track_dns_domain_len))
+						adapter->track_dns_domain_len =
+							0;
 					/* DNStracking isn't supported in FW. */
 					arp_stats_params->pkt_type_bitmap &=
 						~CONNECTIVITY_CHECK_SET_DNS;
@@ -11383,7 +11423,7 @@ static int __wlan_hdd_cfg80211_set_nud_stats(struct wiphy *wiphy,
 		}
 	}
 
-	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_INFO,
+	QDF_TRACE(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
 		  "%s STATS_SET_START Received flag %d!!", __func__,
 		  arp_stats_params.flag);
 
@@ -14957,8 +14997,8 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 					const struct qdf_mac_addr *mac_addr)
 {
 	struct sk_buff *vendor_event;
-	uint32_t sta_flags = 0;
 	QDF_STATUS status;
+	struct  nl80211_sta_flag_update sta_flags;
 
 	ENTER();
 
@@ -14978,18 +15018,21 @@ QDF_STATUS wlan_hdd_send_sta_authorized_event(
 		return -EINVAL;
 	}
 
-	sta_flags |= BIT(NL80211_STA_FLAG_AUTHORIZED);
+	sta_flags.mask |= BIT(NL80211_STA_FLAG_AUTHORIZED);
+	sta_flags.set = true;
 
-	status = nla_put_u32(vendor_event,
+	status = nla_put(vendor_event,
 			     QCA_WLAN_VENDOR_ATTR_LINK_PROPERTIES_STA_FLAGS,
-			     sta_flags);
+			     sizeof(struct  nl80211_sta_flag_update),
+			     &sta_flags);
 	if (status) {
 		hdd_err("STA flag put fails");
 		kfree_skb(vendor_event);
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	status = nla_put(vendor_event,
-			 QCA_WLAN_VENDOR_ATTR_LINK_PROPERTIES_STA_MAC,
+			 QCA_WLAN_VENDOR_ATTR_LINK_PROPERTIES_MAC_ADDR,
 			 QDF_MAC_ADDR_SIZE, mac_addr->bytes);
 	if (status) {
 		hdd_err("STA MAC put fails");
@@ -15487,6 +15530,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 
 	default:
 		hdd_err("Unsupported cipher type: %u", params->cipher);
+		qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 		return -EOPNOTSUPP;
 	}
 
@@ -15507,6 +15551,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 		/* if a key is already installed, block all subsequent ones */
 		if (pAdapter->sessionCtx.station.ibss_enc_key_installed) {
 			hdd_debug("IBSS key installed already");
+			qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 			return 0;
 		}
 
@@ -15517,6 +15562,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 
 		if (0 != status) {
 			hdd_err("sme_roam_set_key failed, status: %d", status);
+			qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 			return -EINVAL;
 		}
 		/*Save the keys here and call sme_roam_set_key for setting
@@ -15525,6 +15571,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 			     &setKey, sizeof(tCsrRoamSetKey));
 
 		pAdapter->sessionCtx.station.ibss_enc_key_installed = 1;
+		qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 		return status;
 	}
 	if ((pAdapter->device_mode == QDF_SAP_MODE) ||
@@ -15587,9 +15634,11 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 						   pAdapter->sessionId, &setKey);
 		if (qdf_ret_status == QDF_STATUS_FT_PREAUTH_KEY_SUCCESS) {
 			hdd_debug("Update PreAuth Key success");
+			qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 			return 0;
 		} else if (qdf_ret_status == QDF_STATUS_FT_PREAUTH_KEY_FAILED) {
 			hdd_err("Update PreAuth Key failed");
+			qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 			return -EINVAL;
 		}
 
@@ -15601,6 +15650,7 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 			hdd_err("sme_roam_set_key failed, status: %d", status);
 			pHddStaCtx->roam_info.roamingState =
 				HDD_ROAM_STATE_NONE;
+			qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 			return -EINVAL;
 		}
 
@@ -15639,10 +15689,12 @@ static int __wlan_hdd_cfg80211_add_key(struct wiphy *wiphy,
 				hdd_err("sme_roam_set_key failed for group key (IBSS), returned %d", status);
 				pHddStaCtx->roam_info.roamingState =
 					HDD_ROAM_STATE_NONE;
+				qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 				return -EINVAL;
 			}
 		}
 	}
+	qdf_mem_zero(&setKey, sizeof(tCsrRoamSetKey));
 	EXIT();
 	return 0;
 }
@@ -16745,7 +16797,8 @@ static bool wlan_hdd_handle_sap_sta_dfs_conc(hdd_adapter_t *adapter,
 	 * machine from disconnected to started and set this event.
 	 * wait for 10 secs to finish this.
 	 */
-	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event, 10000);
+	status = qdf_wait_for_event_completion(&hostapd_state->qdf_event,
+					       CSA_COMPLETE_TIMEOUT_VALUE);
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		hdd_err("wait for qdf_event failed, STA not allowed!!");
 		return false;
@@ -17224,13 +17277,12 @@ static int wlan_hdd_cfg80211_set_auth_type(hdd_adapter_t *pAdapter,
 		hdd_debug("set authentication type to FILS SHARED");
 		pHddStaCtx->conn_info.authType = eCSR_AUTH_TYPE_OPEN_SYSTEM;
 		break;
-
+#endif
 	case NL80211_AUTHTYPE_SAE:
 		hdd_debug("set authentication type to SAE");
 		pHddStaCtx->conn_info.authType = eCSR_AUTH_TYPE_SAE;
 		break;
 
-#endif
 	default:
 		hdd_err("Unsupported authentication type: %d", auth_type);
 		pHddStaCtx->conn_info.authType = eCSR_AUTH_TYPE_UNKNOWN;
@@ -20198,6 +20250,8 @@ static int __wlan_hdd_cfg80211_set_pmksa(struct wiphy *wiphy,
 	sme_set_del_pmkid_cache(halHandle, pAdapter->sessionId,
 					&pmk_cache, true);
 
+	qdf_mem_zero(&pmk_cache, sizeof(pmk_cache));
+
 	EXIT();
 	return QDF_IS_STATUS_SUCCESS(result) ? 0 : -EINVAL;
 }
@@ -20288,6 +20342,8 @@ static int __wlan_hdd_cfg80211_del_pmksa(struct wiphy *wiphy,
 
 	sme_set_del_pmkid_cache(halHandle, pAdapter->sessionId, &pmk_cache,
 						false);
+	qdf_mem_zero(&pmk_cache, sizeof(pmk_cache));
+
 	EXIT();
 	return status;
 }
