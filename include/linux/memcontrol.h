@@ -46,6 +46,7 @@ enum mem_cgroup_stat_index {
 	MEM_CGROUP_STAT_CACHE,		/* # of pages charged as cache */
 	MEM_CGROUP_STAT_RSS,		/* # of pages charged as anon rss */
 	MEM_CGROUP_STAT_RSS_HUGE,	/* # of pages charged as anon huge */
+	MEM_CGROUP_STAT_SHMEM,		/* # of pages charged as shmem */
 	MEM_CGROUP_STAT_FILE_MAPPED,	/* # of pages charged as file rss */
 	MEM_CGROUP_STAT_DIRTY,          /* # of dirty pages in page cache */
 	MEM_CGROUP_STAT_WRITEBACK,	/* # of pages under writeback */
@@ -56,6 +57,9 @@ enum mem_cgroup_stat_index {
 	MEMCG_SLAB_RECLAIMABLE,
 	MEMCG_SLAB_UNRECLAIMABLE,
 	MEMCG_SOCK,
+	MEMCG_WORKINGSET_REFAULT,
+	MEMCG_WORKINGSET_ACTIVATE,
+	MEMCG_WORKINGSET_NODERECLAIM,
 	MEMCG_NR_STAT,
 };
 
@@ -282,17 +286,10 @@ static inline bool mem_cgroup_disabled(void)
 	return !cgroup_subsys_enabled(memory_cgrp_subsys);
 }
 
-/**
- * mem_cgroup_events - count memory events against a cgroup
- * @memcg: the memory cgroup
- * @idx: the event index
- * @nr: the number of events to account for
- */
-static inline void mem_cgroup_events(struct mem_cgroup *memcg,
-		       enum mem_cgroup_events_index idx,
-		       unsigned int nr)
+static inline void mem_cgroup_event(struct mem_cgroup *memcg,
+				    enum mem_cgroup_events_index idx)
 {
-	this_cpu_add(memcg->stat->events[idx], nr);
+	this_cpu_inc(memcg->stat->events[idx]);
 	cgroup_file_notify(&memcg->events_file);
 }
 
@@ -494,15 +491,47 @@ struct mem_cgroup *lock_page_memcg(struct page *page);
 void __unlock_page_memcg(struct mem_cgroup *memcg);
 void unlock_page_memcg(struct page *page);
 
+static inline unsigned long mem_cgroup_read_stat(struct mem_cgroup *memcg,
+						 enum mem_cgroup_stat_index idx)
+{
+	long val = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		val += per_cpu(memcg->stat->count[idx], cpu);
+
+	if (val < 0)
+		val = 0;
+
+	return val;
+}
+
+static inline void mem_cgroup_update_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx, int val)
+{
+	if (!mem_cgroup_disabled())
+		this_cpu_add(memcg->stat->count[idx], val);
+}
+
+static inline void mem_cgroup_inc_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx)
+{
+	mem_cgroup_update_stat(memcg, idx, 1);
+}
+
+static inline void mem_cgroup_dec_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx)
+{
+	mem_cgroup_update_stat(memcg, idx, -1);
+}
+
 static inline void __mem_cgroup_update_page_stat(struct page *page,
 						 struct mem_cgroup *memcg,
 						 enum mem_cgroup_stat_index idx,
 						 int val)
 {
-	VM_BUG_ON(!(rcu_read_lock_held() || PageLocked(page)));
-
 	if (memcg && memcg->stat)
-		this_cpu_add(memcg->stat->count[idx], val);
+		mem_cgroup_update_stat(memcg, idx, val);
 }
 
 /**
@@ -519,6 +548,8 @@ static inline void __mem_cgroup_update_page_stat(struct page *page,
  *   if (TestClearPageState(page))
  *     mem_cgroup_update_page_stat(page, state, -1);
  *   unlock_page(page) or unlock_page_memcg(page)
+ *
+ * Kernel pages are an exception to this, since they'll never move.
  */
 
 static inline void mem_cgroup_update_page_stat(struct page *page,
@@ -586,9 +617,8 @@ static inline bool mem_cgroup_disabled(void)
 	return true;
 }
 
-static inline void mem_cgroup_events(struct mem_cgroup *memcg,
-				     enum mem_cgroup_events_index idx,
-				     unsigned int nr)
+static inline void mem_cgroup_event(struct mem_cgroup *memcg,
+				    enum mem_cgroup_events_index idx)
 {
 }
 
@@ -753,6 +783,27 @@ static inline bool task_in_memcg_oom(struct task_struct *p)
 static inline bool mem_cgroup_oom_synchronize(bool wait)
 {
 	return false;
+}
+
+static inline unsigned long mem_cgroup_read_stat(struct mem_cgroup *memcg,
+						 enum mem_cgroup_stat_index idx)
+{
+	return 0;
+}
+
+static inline void mem_cgroup_update_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx, int val)
+{
+}
+
+static inline void mem_cgroup_inc_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx)
+{
+}
+
+static inline void mem_cgroup_dec_stat(struct mem_cgroup *memcg,
+				   enum mem_cgroup_stat_index idx)
+{
 }
 
 static inline void mem_cgroup_update_page_stat(struct page *page,

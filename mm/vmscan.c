@@ -47,6 +47,7 @@
 #include <linux/prefetch.h>
 #include <linux/printk.h>
 #include <linux/dax.h>
+#include <linux/psi.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -96,8 +97,13 @@ struct scan_control {
 	/* Can pages be swapped as part of reclaim? */
 	unsigned int may_swap:1;
 
-	/* Can cgroups be reclaimed below their normal consumption range? */
-	unsigned int may_thrash:1;
+	/*
+	 * Cgroups are not reclaimed below their configured memory.low,
+	 * unless we threaten to OOM. If any cgroups are skipped due to
+	 * memory.low and nothing was reclaimed, go back for memory.low.
+	 */
+	unsigned int memcg_low_reclaim:1;
+	unsigned int memcg_low_skipped:1;
 
 	unsigned int hibernation_mode:1;
 
@@ -2094,6 +2100,7 @@ static void shrink_active_list(unsigned long nr_to_scan,
 		}
 
 		ClearPageActive(page);	/* we are de-activating */
+		SetPageWorkingset(page);
 		list_add(&page->lru, &l_inactive);
 	}
 
@@ -2129,6 +2136,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
  * Both inactive lists should also be large enough that each inactive
  * page has a chance to be referenced again before it is reclaimed.
  *
+ * If that fails and refaulting is observed, the inactive list grows.
+ *
  * The inactive_ratio is the target ratio of ACTIVE to INACTIVE pages
  * on this LRU, maintained by the pageout code. A zone->inactive_ratio
  * of 3 means 3:1 or 25% of the pages are kept on the inactive list.
@@ -2145,12 +2154,15 @@ static void shrink_active_list(unsigned long nr_to_scan,
  *   10TB     320        32GB
  */
 static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
-						struct scan_control *sc)
+				struct mem_cgroup *memcg,
+				struct scan_control *sc, bool actual_reclaim)
 {
-	unsigned long inactive_ratio;
-	unsigned long inactive, active;
-	enum lru_list inactive_lru = file * LRU_FILE;
 	enum lru_list active_lru = file * LRU_FILE + LRU_ACTIVE;
+	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
+	enum lru_list inactive_lru = file * LRU_FILE;
+	unsigned long inactive, active;
+	unsigned long inactive_ratio;
+	unsigned long refaults;
 	unsigned long gb;
 
 	/*
@@ -2163,20 +2175,37 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 	inactive = lruvec_lru_size(lruvec, inactive_lru, sc->reclaim_idx);
 	active = lruvec_lru_size(lruvec, active_lru, sc->reclaim_idx);
 
-	gb = (inactive + active) >> (30 - PAGE_SHIFT);
-	if (gb)
-		inactive_ratio = int_sqrt(10 * gb);
+	if (memcg)
+		refaults = mem_cgroup_read_stat(memcg,
+						MEMCG_WORKINGSET_ACTIVATE);
 	else
-		inactive_ratio = 1;
+		refaults = node_page_state(pgdat, WORKINGSET_ACTIVATE);
+
+	/*
+	 * When refaults are being observed, it means a new workingset
+	 * is being established. Disable active list protection to get
+	 * rid of the stale workingset quickly.
+	 */
+	if (file && actual_reclaim && lruvec->refaults != refaults) {
+		inactive_ratio = 0;
+	} else {
+		gb = (inactive + active) >> (30 - PAGE_SHIFT);
+		if (gb)
+			inactive_ratio = int_sqrt(10 * gb);
+		else
+			inactive_ratio = 1;
+	}
 
 	return inactive * inactive_ratio < active;
 }
 
 static unsigned long shrink_list(enum lru_list lru, unsigned long nr_to_scan,
-				 struct lruvec *lruvec, struct scan_control *sc)
+				 struct lruvec *lruvec, struct mem_cgroup *memcg,
+				 struct scan_control *sc)
 {
 	if (is_active_lru(lru)) {
-		if (inactive_list_is_low(lruvec, is_file_lru(lru), sc))
+		if (inactive_list_is_low(lruvec, is_file_lru(lru),
+					 memcg, sc, true))
 			shrink_active_list(nr_to_scan, lruvec, sc, lru);
 		return 0;
 	}
@@ -2286,7 +2315,7 @@ static void get_scan_count(struct lruvec *lruvec, struct mem_cgroup *memcg,
 	 * system is under heavy pressure.
 	 */
 	if (!IS_ENABLED(CONFIG_BALANCE_ANON_FILE_RECLAIM) &&
-	    !inactive_list_is_low(lruvec, true, sc) &&
+	    !inactive_list_is_low(lruvec, true, memcg, sc, false) &&
 	    lruvec_lru_size(lruvec, LRU_INACTIVE_FILE, sc->reclaim_idx) >> sc->priority) {
 		scan_balance = SCAN_FILE;
 		goto out;
@@ -2437,7 +2466,7 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 				nr[lru] -= nr_to_scan;
 
 				nr_reclaimed += shrink_list(lru, nr_to_scan,
-							    lruvec, sc);
+							    lruvec, memcg, sc);
 			}
 		}
 
@@ -2504,7 +2533,7 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	 * Even if we did not try to evict anon pages at all, we want to
 	 * rebalance the anon lru active/inactive ratio.
 	 */
-	if (inactive_list_is_low(lruvec, false, sc))
+	if (inactive_list_is_low(lruvec, false, memcg, sc, true))
 		shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 				   sc, LRU_ACTIVE_ANON);
 }
@@ -2618,9 +2647,11 @@ static bool shrink_node(pg_data_t *pgdat, struct scan_control *sc)
 			unsigned long scanned;
 
 			if (mem_cgroup_low(root, memcg)) {
-				if (!sc->may_thrash)
+				if (!sc->memcg_low_reclaim) {
+					sc->memcg_low_skipped = 1;
 					continue;
-				mem_cgroup_events(memcg, MEMCG_LOW, 1);
+				}
+				mem_cgroup_event(memcg, MEMCG_LOW);
 			}
 
 			reclaimed = sc->nr_reclaimed;
@@ -2825,6 +2856,26 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 	sc->gfp_mask = orig_mask;
 }
 
+static void snapshot_refaults(struct mem_cgroup *root_memcg, pg_data_t *pgdat)
+{
+	struct mem_cgroup *memcg;
+
+	memcg = mem_cgroup_iter(root_memcg, NULL, NULL);
+	do {
+		unsigned long refaults;
+		struct lruvec *lruvec;
+
+		if (memcg)
+			refaults = mem_cgroup_read_stat(memcg,
+						MEMCG_WORKINGSET_ACTIVATE);
+		else
+			refaults = node_page_state(pgdat, WORKINGSET_ACTIVATE);
+
+		lruvec = mem_cgroup_lruvec(pgdat, memcg);
+		lruvec->refaults = refaults;
+	} while ((memcg = mem_cgroup_iter(root_memcg, memcg, NULL)));
+}
+
 /*
  * This is the main entry point to direct page reclaim.
  *
@@ -2845,6 +2896,9 @@ static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
 					  struct scan_control *sc)
 {
 	int initial_priority = sc->priority;
+	pg_data_t *last_pgdat;
+	struct zoneref *z;
+	struct zone *zone;
 retry:
 	delayacct_freepages_start();
 
@@ -2871,6 +2925,15 @@ retry:
 			sc->may_writepage = 1;
 	} while (--sc->priority >= 0);
 
+	last_pgdat = NULL;
+	for_each_zone_zonelist_nodemask(zone, z, zonelist, sc->reclaim_idx,
+					sc->nodemask) {
+		if (zone->zone_pgdat == last_pgdat)
+			continue;
+		last_pgdat = zone->zone_pgdat;
+		snapshot_refaults(sc->target_mem_cgroup, zone->zone_pgdat);
+	}
+
 	delayacct_freepages_end();
 
 	if (sc->nr_reclaimed)
@@ -2881,9 +2944,10 @@ retry:
 		return 1;
 
 	/* Untapped cgroup reserves?  Don't OOM, retry. */
-	if (!sc->may_thrash) {
+	if (sc->memcg_low_skipped) {
 		sc->priority = initial_priority;
-		sc->may_thrash = 1;
+		sc->memcg_low_reclaim = 1;
+		sc->memcg_low_skipped = 0;
 		goto retry;
 	}
 
@@ -3105,6 +3169,7 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 {
 	struct zonelist *zonelist;
 	unsigned long nr_reclaimed;
+	unsigned long pflags;
 	int nid;
 	struct scan_control sc = {
 		.nr_to_reclaim = max(nr_pages, SWAP_CLUSTER_MAX),
@@ -3132,9 +3197,13 @@ unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
 					    sc.gfp_mask,
 					    sc.reclaim_idx);
 
+	psi_memstall_enter(&pflags);
 	current->flags |= PF_MEMALLOC;
+
 	nr_reclaimed = do_try_to_free_pages(zonelist, &sc);
+
 	current->flags &= ~PF_MEMALLOC;
+	psi_memstall_leave(&pflags);
 
 	trace_mm_vmscan_memcg_reclaim_end(nr_reclaimed);
 
@@ -3154,7 +3223,7 @@ static void age_active_anon(struct pglist_data *pgdat,
 	do {
 		struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
 
-		if (inactive_list_is_low(lruvec, false, sc))
+		if (inactive_list_is_low(lruvec, false, memcg, sc, true))
 			shrink_active_list(SWAP_CLUSTER_MAX, lruvec,
 					   sc, LRU_ACTIVE_ANON);
 
@@ -3318,6 +3387,7 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 	int i;
 	unsigned long nr_soft_reclaimed;
 	unsigned long nr_soft_scanned;
+	unsigned long pflags;
 	struct zone *zone;
 	struct scan_control sc = {
 		.gfp_mask = GFP_KERNEL,
@@ -3327,6 +3397,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		.may_unmap = 1,
 		.may_swap = 1,
 	};
+
+	psi_memstall_enter(&pflags);
 	count_vm_event(PAGEOUTRUN);
 
 	do {
@@ -3420,6 +3492,8 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		pgdat->kswapd_failures++;
 
 out:
+	snapshot_refaults(NULL, pgdat);
+	psi_memstall_leave(&pflags);
 	/*
 	 * Return the order kswapd stopped reclaiming at as
 	 * prepare_kswapd_sleep() takes it into account. If another caller
