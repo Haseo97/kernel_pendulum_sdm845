@@ -501,7 +501,7 @@
 		gpio-reset = <1>;
 		gpio-vana = <2>;
 		gpio-vdig = <3>;
-		
+
 
 		gpio-req-tbl-num = <0 1 2 3>;
 		gpio-req-tbl-flags = <1 0 0 0>;
