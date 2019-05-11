@@ -2425,8 +2425,6 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		mb();
 		geni_ios = geni_read_reg_nolog(port->uport.membase,
 				SE_GENI_IOS);
-		IPC_LOG_MSG(port->ipc_log_pwr, "%s: Manual Flow ON 0x%x 0x%x\n",
-				__func__, uart_manual_rfr, geni_ios);
 		udelay(10);
 	}
 	stop_rx_sequencer(&port->uport);
