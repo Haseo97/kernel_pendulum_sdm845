@@ -1340,14 +1340,8 @@ struct ext4_super_block {
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (unlikely((sbi)->s_mount_flags & \
 						EXT4_MF_TEST_DUMMY_ENCRYPTION))
-#ifdef CONFIG_EXT4_ANDROID_FS_ENCRYPTION
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (1)
-#else
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (0)
-#endif
 #else
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (0)
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (0)
 #endif
 
 /* Number of quota types we support */
@@ -2271,11 +2265,6 @@ extern unsigned ext4_free_clusters_after_init(struct super_block *sb,
 					      ext4_group_t block_group,
 					      struct ext4_group_desc *gdp);
 ext4_fsblk_t ext4_inode_to_goal_block(struct inode *);
-
-static inline bool ext4_encrypted_inode(struct inode *inode)
-{
-	return ext4_test_inode_flag(inode, EXT4_INODE_ENCRYPT);
-}
 
 #ifdef CONFIG_EXT4_FS_ENCRYPTION
 static inline int ext4_fname_setup_filename(struct inode *dir,
