@@ -291,20 +291,6 @@ static inline struct hlist_nulls_head *select_bucket(struct bpf_htab *htab, u32 
 	return &__select_bucket(htab, hash)->head;
 }
 
-/* this lookup function can only be called with bucket lock taken */
-static struct htab_elem *lookup_elem_raw(struct hlist_nulls_head *head, u32 hash,
-					 void *key, u32 key_size)
-{
-	struct hlist_nulls_node *n;
-	struct htab_elem *l;
-
-	hlist_nulls_for_each_entry_rcu(l, n, head, hash_node)
-		if (l->hash == hash && !memcmp(&l->key, key, key_size))
-			return l;
-
-	return NULL;
-}
-
 /* can be called without bucket lock. it will repeat the loop in
  * the unlikely event when elements moved from one bucket into another
  * while link list is being walked
@@ -584,7 +570,7 @@ static int htab_map_update_elem(struct bpf_map *map, void *key, void *value,
 	/* bpf_map_update_elem() can be called in_irq() */
 	raw_spin_lock_irqsave(&b->lock, flags);
 
-	l_old = lookup_elem_raw(head, hash, key, key_size);
+	l_old = lookup_nulls_elem_raw(head, hash, key, key_size, htab->n_buckets);
 
 	ret = check_flags(htab, l_old, map_flags);
 	if (ret)
@@ -640,7 +626,7 @@ static int __htab_percpu_map_update_elem(struct bpf_map *map, void *key,
 	/* bpf_map_update_elem() can be called in_irq() */
 	raw_spin_lock_irqsave(&b->lock, flags);
 
-	l_old = lookup_elem_raw(head, hash, key, key_size);
+	l_old = lookup_nulls_elem_raw(head, hash, key, key_size, htab->n_buckets);
 
 	ret = check_flags(htab, l_old, map_flags);
 	if (ret)
@@ -705,7 +691,7 @@ static int htab_map_delete_elem(struct bpf_map *map, void *key)
 
 	raw_spin_lock_irqsave(&b->lock, flags);
 
-	l = lookup_elem_raw(head, hash, key, key_size);
+	l = lookup_nulls_elem_raw(head, hash, key, key_size, htab->n_buckets);
 
 	if (l) {
 		hlist_nulls_del_rcu(&l->hash_node);
