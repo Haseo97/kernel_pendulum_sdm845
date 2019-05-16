@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.175 Kernel Configuration
+# Linux/arm64 4.9.177-rc1 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -4916,7 +4916,6 @@ CONFIG_PSTORE_ZLIB_COMPRESS=y
 CONFIG_PSTORE_CONSOLE=y
 CONFIG_PSTORE_PMSG=y
 CONFIG_PSTORE_RAM=y
-CONFIG_PSTORE_LAST_KMSG=y
 # CONFIG_SYSV_FS is not set
 # CONFIG_UFS_FS is not set
 CONFIG_NETWORK_FILESYSTEMS=y
