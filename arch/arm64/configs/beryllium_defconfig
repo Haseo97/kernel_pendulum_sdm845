@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.9.175 Kernel Configuration
+# Linux/arm64 4.9.178 Kernel Configuration
 #
 CONFIG_ARM64=y
 CONFIG_64BIT=y
@@ -4159,7 +4159,6 @@ CONFIG_QPNP_REVID=y
 # CONFIG_GPIO_USB_DETECT is not set
 CONFIG_USB_BAM=y
 # CONFIG_MSM_11AD is not set
-CONFIG_SEEMP_CORE=y
 CONFIG_QCOM_GENI_SE=y
 CONFIG_MSM_EXT_DISPLAY=y
 CONFIG_CLKDEV_LOOKUP=y
