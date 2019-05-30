@@ -758,7 +758,8 @@ endif
 endif
 
 ifeq ($(cc-name),clang)
-KBUILD_CFLAGS	+= -O3
+KBUILD_CFLAGS	+= -O3 \
+		   -mcpu=cortex-a55 -mtune=cortex-a55
 endif
 
 ifdef CONFIG_SHADOW_CALL_STACK
