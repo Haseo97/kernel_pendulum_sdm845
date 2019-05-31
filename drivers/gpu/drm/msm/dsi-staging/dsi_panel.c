@@ -33,7 +33,7 @@
 #include <soc/qcom/socinfo.h>
 
 #ifdef CONFIG_KLAPSE
-#include "../sde/klapse.h"
+#include <linux/klapse.h>
 #endif
 
 #define DSI_READ_WRITE_PANEL_DEBUG 1
