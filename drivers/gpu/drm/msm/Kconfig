@@ -170,9 +170,3 @@ config DRM_SYNC_DEBUG
 	help
 	  This makes MSM DRM drivers keep track of fence names.
 
-config KLAPSE
-	bool "KLapse dynamic RGB scaling module"
-	depends on DRM_MSM
-	help
-	  A simple dynamic RGB lapsing module similar to LineageOS' LiveDisplay.
-
