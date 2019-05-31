@@ -211,10 +211,14 @@ static void scan_and_kill(unsigned long pages_needed)
 	for (i = 0; i < nr_to_kill; i++) {
 		struct victim_info *victim = &victims[i];
 		struct task_struct *vtsk = victim->tsk;
+		struct task_struct *curr = current;
 
-		pr_info("Killing %s with adj %d to free %lu KiB\n", vtsk->comm,
+		if (curr->flags & PF_KTHREAD)
+			pr_info("Killing %s with adj %d to free %lu KiB on behalf of '%s'\n",
+				vtsk->comm,
 			vtsk->signal->oom_score_adj,
-			victim->size << (PAGE_SHIFT - 10));
+			victim->size << (PAGE_SHIFT - 10),
+			(curr->flags & PF_KTHREAD) ? "a kthread" : curr->comm);
 
 		/* Accelerate the victim's death by forcing the kill signal */
 		do_send_sig_info(SIGKILL, SIG_INFO_TYPE, vtsk, KILL_GROUP_TYPE);
