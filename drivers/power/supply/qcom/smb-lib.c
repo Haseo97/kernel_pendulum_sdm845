@@ -41,7 +41,7 @@
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
 
-bool skip_thermal = false;
+bool skip_thermal = true;
 module_param(skip_thermal, bool, 0644);
 
 static bool off_charge_flag;
