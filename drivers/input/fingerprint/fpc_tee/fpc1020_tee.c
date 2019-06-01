@@ -83,12 +83,16 @@ struct fpc1020_data {
 	struct regulator *vreg[ARRAY_SIZE(vreg_conf)];
 
 	struct wakeup_source ttw_wl;
+	struct wakeup_source screen_wl;
 	int irq_gpio;
 	int rst_gpio;
 	struct mutex lock; /* To set/get exported values in sysfs */
 	bool prepared;
 	atomic_t wakeup_enabled; /* Used both in ISR and non-ISR */
 	int irqf;
+
+	bool fb_black;
+	struct notifier_block fb_notifier;
 };
 
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle);
@@ -522,6 +526,18 @@ static ssize_t irq_enable_set(struct device *dev,
 }
 static DEVICE_ATTR(irq_enable, S_IWUSR | S_IRUSR | S_IRGRP | S_IWGRP , NULL, irq_enable_set);
 
+static ssize_t screen_status_get(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int retval = 0;
+	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+
+	retval = (fpc1020->fb_black == true) ? 0 : 1;
+
+	return scnprintf(buf, PAGE_SIZE, "%d\n", retval);
+}
+
+static DEVICE_ATTR(screen_status, S_IRUSR | S_IRGRP, screen_status_get, NULL);
+
 static struct attribute *attributes[] = {
 	&dev_attr_pinctl_set.attr,
 	&dev_attr_device_prepare.attr,
@@ -531,6 +547,7 @@ static struct attribute *attributes[] = {
 	&dev_attr_clk_enable.attr,
 	&dev_attr_irq_enable.attr,
 	&dev_attr_irq.attr,
+	&dev_attr_screen_status.attr,
 	NULL
 };
 
@@ -575,6 +592,51 @@ static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
 
 	return 0;
 }
+
+static int fpc_fb_notif_callback(struct notifier_block *nb,
+		unsigned long val, void *data)
+{
+	struct fpc1020_data *fpc1020 = container_of(nb, struct fpc1020_data,
+			fb_notifier);
+	struct fb_event *evdata = data;
+	unsigned int blank;
+
+	if (!fpc1020)
+		return 0;
+
+	if (!evdata)
+		return 0;
+
+	if (!evdata->data)
+		return 0;
+
+	if (val != DRM_EVENT_BLANK || fpc1020->prepared == false)
+		return 0;
+
+	blank = *(int *)(evdata->data);
+	switch (blank) {
+	case DRM_BLANK_POWERDOWN:
+		fpc1020->fb_black = true;
+#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
+		__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
+		sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
+#endif
+		break;
+	case DRM_BLANK_UNBLANK:
+		fpc1020->fb_black = false;
+#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
+		__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
+		sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
+#endif
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block fpc_notif_block = {
+	.notifier_call = fpc_fb_notif_callback,
+};
 
 static int fpc1020_probe(struct platform_device *pdev)
 {
@@ -640,6 +702,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 	mutex_init(&fpc1020->lock);
 
 	wakeup_source_init(&fpc1020->ttw_wl, "fpc_ttw_wl");
+	wakeup_source_init(&fpc1020->screen_wl, "fpc_screen_wl");
 
 	rc = sysfs_create_group(&dev->kobj, &attribute_group);
 	if (rc) {
@@ -652,6 +715,10 @@ static int fpc1020_probe(struct platform_device *pdev)
 		(void)device_prepare(fpc1020, true);
 	}
 
+	fpc1020->fb_black = false;
+	fpc1020->fb_notifier = fpc_notif_block;
+	drm_register_client(&fpc1020->fb_notifier);
+
 	dev_info(dev, "%s: ok\n", __func__);
 
 exit:
@@ -662,9 +729,11 @@ static int fpc1020_remove(struct platform_device *pdev)
 {
 	struct fpc1020_data *fpc1020 = platform_get_drvdata(pdev);
 
+	drm_unregister_client(&fpc1020->fb_notifier);
 	sysfs_remove_group(&pdev->dev.kobj, &attribute_group);
 	mutex_destroy(&fpc1020->lock);
 	wakeup_source_trash(&fpc1020->ttw_wl);
+	wakeup_source_trash(&fpc1020->screen_wl);
 	(void)vreg_setup(fpc1020, "vdd_ana", false);
     /*
 	(void)vreg_setup(fpc1020, "vdd_io", false);
