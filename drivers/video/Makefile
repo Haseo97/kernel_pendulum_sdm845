@@ -13,3 +13,6 @@ ifeq ($(CONFIG_OF),y)
 obj-$(CONFIG_VIDEOMODE_HELPERS) += of_display_timing.o of_videomode.o
 endif
 obj-$(CONFIG_KLAPSE)    += klapse/klapse.o
+
+# TODO: Delete me later
+subdir-ccflags-y := $(call cc-disable-warning, strict-prototypes)
