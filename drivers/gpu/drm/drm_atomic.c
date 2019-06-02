@@ -31,7 +31,7 @@
 #include <drm/drm_mode.h>
 #include <drm/drm_plane_helper.h>
 #include <linux/sync_file.h>
-#include <linux/cpu_boost.h>
+#include <linux/cpu_input_boost.h>
 #include <linux/devfreq_boost.h>
 
 #include "drm_crtc_internal.h"
@@ -1907,7 +1907,7 @@ int drm_mode_atomic_ioctl(struct drm_device *dev,
 		return -EINVAL;
 
 	if (!(arg->flags & DRM_MODE_ATOMIC_TEST_ONLY)) {
-		do_input_boost_max();
+		cpu_input_boost_kick();
 		devfreq_boost_kick(DEVFREQ_MSM_CPUBW);
 	}
 
