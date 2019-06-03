@@ -63,7 +63,6 @@
 #include <linux/nsproxy.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
-#include <linux/cpu_boost.h>
 #include <linux/devfreq_boost.h>
 #include <net/sock.h>
 
@@ -2965,7 +2964,6 @@ static ssize_t __cgroup_procs_write(struct kernfs_open_file *of, char *buf,
 	if (!ret && !threadgroup &&
 	    !strcmp(of->kn->parent->name, "top-app") &&
 	    is_zygote_pid(tsk->parent->pid)) {
-		do_input_boost_max();
 		devfreq_boost_kick_max(DEVFREQ_MSM_CPUBW, 500);
 	}
 
