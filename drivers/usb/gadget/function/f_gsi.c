@@ -3722,11 +3722,11 @@ static int fgsi_init(void)
 		if (IS_ERR(__gsi[i]))
 			return PTR_ERR(__gsi[i]);
 	}
-
+#if 0
 	ipc_log_ctxt = ipc_log_context_create(NUM_LOG_PAGES, "usb_gsi", 0);
 	if (!ipc_log_ctxt)
 		pr_err("%s: Err allocating ipc_log_ctxt\n", __func__);
-
+#endif
 	usb_gsi_debugfs_init();
 	return usb_function_register(&gsiusb_func);
 }
