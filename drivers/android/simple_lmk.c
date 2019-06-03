@@ -170,6 +170,9 @@ static int process_victims(struct victim_info *varr, int vlen,
 	return nr_to_kill;
 }
 
+static int dead_tasks = 0;
+module_param(dead_tasks, int, 0444);
+
 static void scan_and_kill(unsigned long pages_needed)
 {
 	int i, nr_to_kill = 0, nr_victims = 0;
@@ -242,6 +245,8 @@ static void scan_and_kill(unsigned long pages_needed)
 		put_task_struct(vtsk);
 	}
 
+	dead_tasks++;
+	pr_info("dead_tasks: %i\n", dead_tasks);
 	/* Wait until all the victims die */
 	wait_for_completion(&reclaim_done);
 }
@@ -284,12 +289,14 @@ void simple_lmk_decide_reclaim(int kswapd_priority)
 	if (kswapd_priority != CONFIG_ANDROID_SIMPLE_LMK_AGGRESSION)
 		return;
 
+	pr_info("%s: fire, water, burn, kswapd prio = %i\n", __func__, kswapd_priority);
 	if (!cmpxchg(&needs_reclaim, false, true))
 		wake_up(&oom_waitq);
 }
 
 void simple_lmk_stop_reclaim(void)
 {
+	pr_info("%s: stop\n", __func__);
 	WRITE_ONCE(needs_reclaim, false);
 }
 
