@@ -68,7 +68,7 @@ struct vreg_config {
 	int ua_load;
 };
 
-static const struct vreg_config vreg_conf[] = {
+static const struct vreg_config const vreg_conf[] = {
 	{ "vdd_ana", 1800000UL, 1800000UL, 6000, },
 	{ "fp_vdd_vreg", 3000000UL, 3000000UL, 6000, },
 	/*{ "vcc_spi", 1800000UL, 1800000UL, 10, },*/
@@ -90,9 +90,10 @@ struct fpc1020_data {
 	bool prepared;
 	atomic_t wakeup_enabled; /* Used both in ISR and non-ISR */
 	int irqf;
-
-	bool fb_black;
 	struct notifier_block fb_notifier;
+	bool fb_black;
+	bool wait_finger_down;
+	struct work_struct work;
 };
 
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle);
@@ -503,6 +504,24 @@ static ssize_t irq_ack(struct device *dev,
 }
 static DEVICE_ATTR(irq, S_IRUSR | S_IWUSR, irq_get, irq_ack);
 
+static ssize_t fingerdown_wait_set(struct device *dev,
+	struct device_attribute *attr,
+	const char *buf, size_t count)
+{
+	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+
+	dev_dbg(fpc1020->dev, "%s\n", __func__);
+	if (!strncmp(buf, "enable", strlen("enable")) && fpc1020->prepared)
+		fpc1020->wait_finger_down = true;
+	else if (!strncmp(buf, "disable", strlen("disable")) && fpc1020->prepared)
+		fpc1020->wait_finger_down = false;
+	else
+		return -EINVAL;
+
+	return count;
+}
+static DEVICE_ATTR(fingerdown_wait, S_IWUSR, NULL, fingerdown_wait_set);
+
 static ssize_t irq_enable_set(struct device *dev,
 	struct device_attribute *attr,
 	const char *buf, size_t count)
@@ -535,7 +554,6 @@ static ssize_t screen_status_get(struct device *dev, struct device_attribute *at
 
 	return scnprintf(buf, PAGE_SIZE, "%d\n", retval);
 }
-
 static DEVICE_ATTR(screen_status, S_IRUSR | S_IRGRP, screen_status_get, NULL);
 
 static struct attribute *attributes[] = {
@@ -548,12 +566,20 @@ static struct attribute *attributes[] = {
 	&dev_attr_irq_enable.attr,
 	&dev_attr_irq.attr,
 	&dev_attr_screen_status.attr,
+	&dev_attr_fingerdown_wait.attr,
 	NULL
 };
 
 static const struct attribute_group attribute_group = {
 	.attrs = attributes,
 };
+
+static void notification_work(struct work_struct *work)
+{
+	pr_debug("%s: unblank\n", __func__);
+	dsi_bridge_interface_enable(FP_UNLOCK_REJECTION_TIMEOUT);
+}
+
 
 static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 {
@@ -566,6 +592,11 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	}
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
+	if (fpc1020->wait_finger_down && fpc1020->fb_black && fpc1020->prepared) {
+		pr_debug("%s enter\n", __func__);
+		fpc1020->wait_finger_down = false;
+		schedule_work(&fpc1020->work);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -604,35 +635,36 @@ static int fpc_fb_notif_callback(struct notifier_block *nb,
 	if (!fpc1020)
 		return 0;
 
-	if (!evdata)
-		return 0;
-
-	if (!evdata->data)
-		return 0;
-
 	if (val != DRM_EVENT_BLANK || fpc1020->prepared == false)
 		return 0;
 
-	blank = *(int *)(evdata->data);
-	switch (blank) {
-	case DRM_BLANK_POWERDOWN:
-		fpc1020->fb_black = true;
-#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
-		__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
-		sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
-#endif
-		break;
-	case DRM_BLANK_UNBLANK:
-		fpc1020->fb_black = false;
-#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
-		__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
-		sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
-#endif
-		break;
-	}
+	pr_debug("[info] %s value = %d\n", __func__, (int)val);
 
+	if (evdata && evdata->data && val == DRM_EVENT_BLANK) {
+		blank = *(int *)(evdata->data);
+		switch (blank) {
+		case DRM_BLANK_POWERDOWN:
+			fpc1020->fb_black = true;
+#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
+			__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
+			sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
+#endif
+			break;
+		case DRM_BLANK_UNBLANK:
+			fpc1020->fb_black = false;
+#ifdef CONFIG_FINGERPRINT_FPC_SCREEN_NOTIFY
+			__pm_wakeup_event(&fpc1020->screen_wl, FPC_SCREEN_HOLD_TIME);
+			sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_screen_status.attr.name);
+#endif
+			break;
+		default:
+			pr_debug("%s defalut\n", __func__);
+			break;
+		}
+	}
 	return NOTIFY_OK;
 }
+
 
 static struct notifier_block fpc_notif_block = {
 	.notifier_call = fpc_fb_notif_callback,
@@ -716,6 +748,8 @@ static int fpc1020_probe(struct platform_device *pdev)
 	}
 
 	fpc1020->fb_black = false;
+	fpc1020->wait_finger_down = false;
+	INIT_WORK(&fpc1020->work, notification_work);
 	fpc1020->fb_notifier = fpc_notif_block;
 	drm_register_client(&fpc1020->fb_notifier);
 
