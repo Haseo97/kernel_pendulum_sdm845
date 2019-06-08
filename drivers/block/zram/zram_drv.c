@@ -50,7 +50,6 @@ static const char *default_compressor = "lz4";
 
 /* Module params (documentation at end) */
 static unsigned int num_devices = 1;
-static struct zram **zram_devices;
 /*
  * Pages that compress to sizes equals or greater than this are stored
  * uncompressed in memory.
@@ -672,7 +671,7 @@ static ssize_t writeback_store(struct device *dev,
 		if (zram->wb_limit_enable && !zram->bd_wb_limit) {
 			spin_unlock(&zram->wb_limit_lock);
 			ret = -EIO;
-			goto error;
+			break;
 		}
 		spin_unlock(&zram->wb_limit_lock);
 
@@ -680,7 +679,7 @@ static ssize_t writeback_store(struct device *dev,
 			blk_idx = alloc_block_bdev(zram);
 			if (!blk_idx) {
 				ret = -ENOSPC;
-				goto error;
+				break;
 			}
 		}
 
@@ -696,7 +695,6 @@ static ssize_t writeback_store(struct device *dev,
 		if (mode == IDLE_WRITEBACK &&
 			  !zram_test_flag(zram, index, ZRAM_IDLE))
 			goto next;
-
 		if (mode == HUGE_WRITEBACK &&
 			  !zram_test_flag(zram, index, ZRAM_HUGE))
 			goto next;
@@ -725,7 +723,7 @@ static ssize_t writeback_store(struct device *dev,
 		bio.bi_iter.bi_sector = blk_idx * (PAGE_SIZE >> 9);
 		bio_set_op_attrs(&bio, REQ_OP_WRITE, REQ_SYNC);
 		bio_add_page(&bio, bvec.bv_page, bvec.bv_len,
-					bvec.bv_offset);
+				bvec.bv_offset);
 		/*
 		 * XXX: A single page IO would be inefficient for write
 		 * but it would be not bad as starter.
@@ -765,16 +763,16 @@ static ssize_t writeback_store(struct device *dev,
 		atomic64_inc(&zram->stats.pages_stored);
 		spin_lock(&zram->wb_limit_lock);
 		if (zram->wb_limit_enable && zram->bd_wb_limit > 0)
-			zram->bd_wb_limit -=  1UL << (PAGE_SHIFT - 12);
+			zram->bd_wb_limit -=  min_t(u64,
+				1UL << (PAGE_SHIFT - 12), zram->bd_wb_limit);
 		spin_unlock(&zram->wb_limit_lock);
 next:
 		zram_slot_unlock(zram, index);
 	}
 
-	ret = len;
-error:
 	if (blk_idx)
 		free_block_bdev(zram, blk_idx);
+	ret = len;
 	__free_page(page);
 release_init_lock:
 	up_read(&zram->init_lock);
@@ -1045,31 +1043,6 @@ static ssize_t compact_store(struct device *dev,
 
 	return len;
 }
-
-int zs_get_page_usage(unsigned long *total_pool_pages,
-			unsigned long *total_ori_pages)
-{
-	int i;
-	*total_pool_pages = *total_ori_pages = 0;
-	if (!zram_devices)
-		return 0;
-	for (i = 0; i < num_devices; i++) {
-		struct zram *zram = zram_devices[i];
-		struct zram_meta *meta;
-		if (!zram)
-			return 0;
-		meta = zram->meta;
-		if (!down_read_trylock(&zram->init_lock))
-			continue;
-		if (init_done(zram)) {
-			*total_pool_pages += zs_get_total_pages(meta->mem_pool);
-			*total_ori_pages += atomic64_read(
-						&zram->stats.pages_stored);
-		}
-		up_read(&zram->init_lock);
-	}
-	return 0;
- }
 
 static ssize_t io_stat_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1354,7 +1327,6 @@ static int __zram_bvec_write(struct zram *zram, struct bio_vec *bvec,
 	int ret = 0;
 	unsigned long alloced_pages;
 	unsigned long handle = 0;
-	static unsigned long zram_rs_time;
 	unsigned int comp_len = 0;
 	void *src, *dst, *mem;
 	struct zcomp_strm *zstrm;
@@ -1385,7 +1357,7 @@ compress_again:
 		return ret;
 	}
 
-	if (comp_len > max_zpage_size)
+	if (comp_len >= huge_class_size)
 		comp_len = PAGE_SIZE;
 	/*
 	 * handle allocation has 2 paths:
@@ -1405,19 +1377,15 @@ compress_again:
 				__GFP_KSWAPD_RECLAIM |
 				__GFP_NOWARN |
 				__GFP_HIGHMEM |
-				__GFP_MOVABLE |
-				__GFP_CMA);
+				__GFP_MOVABLE);
 	if (!handle) {
 		zcomp_stream_put(zram->comp);
 		atomic64_inc(&zram->stats.writestall);
 		handle = zs_malloc(zram->mem_pool, comp_len,
 				GFP_NOIO | __GFP_HIGHMEM |
-				__GFP_MOVABLE | __GFP_CMA);
+				__GFP_MOVABLE);
 		if (handle)
 			goto compress_again;
-
-		if (printk_timed_ratelimit(&zram_rs_time,
-					   ALLOC_ERROR_LOG_RATE_MS))
 		return -ENOMEM;
 	}
 
@@ -1920,7 +1888,7 @@ static int zram_add(void)
 {
 	struct zram *zram;
 	struct request_queue *queue;
-	int i, ret, device_id;
+	int ret, device_id;
 
 	zram = kzalloc(sizeof(struct zram), GFP_KERNEL);
 	if (!zram)
@@ -1994,20 +1962,12 @@ static int zram_add(void)
 		zram->disk->queue->limits.discard_zeroes_data = 0;
 	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, zram->disk->queue);
 
-	disk_to_dev(zram->disk)->groups = zram_disk_attr_groups;
-
-	zram->disk->queue->backing_dev_info.capabilities |=
+	zram->disk->queue->backing_dev_info->capabilities |=
 					BDI_CAP_STABLE_WRITES;
+	disk_to_dev(zram->disk)->groups = zram_disk_attr_groups;
 	add_disk(zram->disk);
 
 	strlcpy(zram->compressor, default_compressor, sizeof(zram->compressor));
-
-	for (i = 0; i < num_devices; i++) {
-		if (!zram_devices[i]) {
-			zram_devices[i] = zram;
-			break;
-		}
-	}
 
 	zram_debugfs_register(zram);
 	pr_info("Added device: %s\n", zram->disk->disk_name);
@@ -2127,7 +2087,6 @@ static int zram_remove_cb(int id, void *ptr, void *data)
 
 static void destroy_devices(void)
 {
-	kfree(zram_devices);
 	class_unregister(&zram_control_class);
 	idr_for_each(&zram_index_idr, &zram_remove_cb, NULL);
 	zram_debugfs_destroy();
@@ -2138,10 +2097,6 @@ static void destroy_devices(void)
 static int __init zram_init(void)
 {
 	int ret;
-
-	zram_devices = kzalloc(num_devices * sizeof(struct zram *), GFP_KERNEL);
-	if (!zram_devices)
-		return -ENOMEM;
 
 	ret = class_register(&zram_control_class);
 	if (ret) {
