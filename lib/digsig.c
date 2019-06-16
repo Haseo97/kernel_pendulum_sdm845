@@ -86,12 +86,15 @@ static int digsig_verify_rsa(struct key *key,
 
 	down_read(&key->sem);
 	ukp = user_key_payload_locked(key);
+<<<<<<< HEAD
 
 	if (!ukp) {
 		/* key was revoked before we acquired its semaphore */
 		err = -EKEYREVOKED;
 		goto err1;
 	}
+=======
+>>>>>>> 9760c4a8dcbf8e97ca7ed117be881d798c845164
 
 	if (ukp->datalen < sizeof(*pkh))
 		goto err1;
