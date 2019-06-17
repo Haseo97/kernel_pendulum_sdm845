@@ -1446,7 +1446,7 @@ static int inode_doinit_with_dentry(struct inode *inode, struct dentry *opt_dent
 		}
 
 		context_onstack[sizeof(context_onstack) - 1] = '\0';
-		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX, context, len);
+		rc = __vfs_getxattr(dentry, inode, XATTR_NAME_SELINUX,
 					   context_onstack,
 					   sizeof(context_onstack));
 		if (rc == -ERANGE) {
