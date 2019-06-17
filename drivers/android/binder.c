@@ -6196,7 +6196,7 @@ static int __init binder_init(void)
 
 	ret = binder_alloc_shrinker_init();
 	if (ret)
-		return ret;
+		goto err_workqueue_init_failed;
 
 	atomic_set(&binder_transaction_log.cur, ~0U);
 	atomic_set(&binder_transaction_log_failed.cur, ~0U);
