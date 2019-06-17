@@ -275,7 +275,6 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 {
 	struct kernfs_open_file *of = kernfs_of(file);
 	const struct kernfs_ops *ops;
-	char buf_onstack[SZ_1K];
 	ssize_t len;
 	char *buf;
 
@@ -291,15 +290,9 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 	if (buf)
 		mutex_lock(&of->prealloc_mutex);
 	else
-	if (!buf) {
-		if (len < sizeof(buf_onstack)) {
-			buf = buf_onstack;
-		} else {
-			buf = kmalloc(len + 1, GFP_KERNEL);
-			if (!buf)
-				return -ENOMEM;
-		}
-	}
+		buf = kmalloc(len + 1, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
 
 	if (copy_from_user(buf, user_buf, len)) {
 		len = -EFAULT;
@@ -331,7 +324,7 @@ static ssize_t kernfs_fop_write(struct file *file, const char __user *user_buf,
 		*ppos += len;
 
 out_free:
-	if (buf == of->prealloc_buf && buf != buf_onstack)
+	if (buf == of->prealloc_buf)
 		mutex_unlock(&of->prealloc_mutex);
 	else
 		kfree(buf);
