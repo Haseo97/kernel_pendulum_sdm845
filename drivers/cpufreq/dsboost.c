@@ -187,8 +187,7 @@ static int dsboost_init(void)
 
 	dsboost_wq = alloc_workqueue("dsboost_wq", WQ_FREEZABLE, 0);
 	if (!dsboost_wq) {
-		ret = -ENOMEM;
-		goto err_wq;
+		return -ENOMEM;
 	}
 
 	INIT_WORK(&input_boost_work, do_input_boost);
@@ -196,17 +195,15 @@ static int dsboost_init(void)
 
 	ret = input_register_handler(&dsboost_input_handler);
 	if (ret)
-		goto err_input;
+		goto err_wq;
 
 	msm_drm_notifier.notifier_call = msm_drm_notifier_cb;
 	msm_drm_notifier.priority = INT_MAX;
 	ret = msm_drm_register_client(&msm_drm_notifier);
 	if (ret)
-		goto err_notifier;
+		goto err_input;
 
 	return 0;
-err_notifier:
-	msm_drm_unregister_client(&msm_drm_notifier);
 err_input:
 	input_unregister_handler(&dsboost_input_handler);
 err_wq:
