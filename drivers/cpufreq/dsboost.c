@@ -11,14 +11,14 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/fb.h>
+#include <linux/msm_drm_notify.h>
 #include <linux/input.h>
 #include <linux/moduleparam.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 
-struct notifier_block fb_notifier;
+struct notifier_block msm_drm_notifier;
 
 static struct workqueue_struct *dsboost_wq;
 
@@ -159,16 +159,16 @@ static struct input_handler dsboost_input_handler = {
 	.id_table       = dsboost_ids,
 };
 
-static int fb_notifier_cb(struct notifier_block *nb, unsigned long action,
+static int msm_drm_notifier_cb(struct notifier_block *nb, unsigned long action,
 			  void *data)
 {
-	int *blank = ((struct fb_event *) data)->data;
+	int *blank = ((struct msm_drm_notifier *) data)->data;
 
-	if (action != FB_EARLY_EVENT_BLANK)
+	if (action != MSM_DRM_EARLY_EVENT_BLANK)
 		return NOTIFY_OK;
 
 	/* Remove input boosting on screen suspend */
-	if (input_stune_boost_active && *blank != FB_BLANK_UNBLANK)
+	if (input_stune_boost_active && *blank != MSM_DRM_BLANK_UNBLANK)
 		cancel_delayed_work_sync(&input_boost_rem);
 
 	return NOTIFY_OK;
@@ -177,7 +177,7 @@ static int fb_notifier_cb(struct notifier_block *nb, unsigned long action,
 static void dsboost_exit(void)
 {
 	input_unregister_handler(&dsboost_input_handler);
-	fb_unregister_client(&fb_notifier);
+	msm_drm_unregister_client(&msm_drm_notifier);
 	destroy_workqueue(dsboost_wq);
 }
 
@@ -198,15 +198,15 @@ static int dsboost_init(void)
 	if (ret)
 		goto err_input;
 
-	fb_notifier.notifier_call = fb_notifier_cb;
-	fb_notifier.priority = INT_MAX;
-	ret = fb_register_client(&fb_notifier);
+	msm_drm_notifier.notifier_call = msm_drm_notifier_cb;
+	msm_drm_notifier.priority = INT_MAX;
+	ret = msm_drm_register_client(&msm_drm_notifier);
 	if (ret)
 		goto err_notifier;
 
 	return 0;
 err_notifier:
-	fb_unregister_client(&fb_notifier);
+	msm_drm_unregister_client(&msm_drm_notifier);
 err_input:
 	input_unregister_handler(&dsboost_input_handler);
 err_wq:
