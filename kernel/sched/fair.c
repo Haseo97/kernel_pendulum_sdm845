@@ -532,6 +532,7 @@ void account_cfs_rq_runtime(struct cfs_rq *cfs_rq, u64 delta_exec);
 static inline u64 max_vruntime(u64 max_vruntime, u64 vruntime)
 {
 	s64 delta = (s64)(vruntime - max_vruntime);
+
 	if (delta > 0)
 		max_vruntime = vruntime;
 
@@ -541,6 +542,7 @@ static inline u64 max_vruntime(u64 max_vruntime, u64 vruntime)
 static inline u64 min_vruntime(u64 min_vruntime, u64 vruntime)
 {
 	s64 delta = (s64)(vruntime - min_vruntime);
+
 	if (delta < 0)
 		min_vruntime = vruntime;
 
@@ -862,6 +864,7 @@ void post_init_entity_util_avg(struct sched_entity *se)
 
 	if (entity_is_task(se)) {
 		struct task_struct *p = task_of(se);
+
 		if (p->sched_class != &fair_sched_class) {
 			/*
 			 * For !fair tasks do:
@@ -924,6 +927,7 @@ static void update_curr(struct cfs_rq *cfs_rq)
 		struct task_struct *curtask = task_of(curr);
 #ifdef CONFIG_PACKAGE_RUNTIME_INFO
 		int cpu = cpu_of(rq_of(cfs_rq));
+
 		update_task_runtime_info(curtask, delta_exec, cpu);
 #endif
 		trace_sched_stat_runtime(curtask, delta_exec, curr->vruntime);
@@ -1383,7 +1387,7 @@ static inline unsigned long group_weight(struct task_struct *p, int nid,
 	return 1000 * faults / total_faults;
 }
 
-bool should_numa_migrate_memory(struct task_struct *p, struct page * page,
+bool should_numa_migrate_memory(struct task_struct *p, struct page *page,
 				int src_nid, int dst_cpu)
 {
 	struct numa_group *ng = p->numa_group;
@@ -1495,7 +1499,7 @@ static void update_numa_stats(struct numa_stats *ns, int nid)
 	smt = DIV_ROUND_UP(SCHED_CAPACITY_SCALE * cpus, ns->compute_capacity);
 	capacity = cpus / smt; /* cores */
 
-	ns->task_capacity = min_t(unsigned, capacity,
+	ns->task_capacity = min_t(unsigned int, capacity,
 		DIV_ROUND_CLOSEST(ns->compute_capacity, SCHED_CAPACITY_SCALE));
 	ns->has_free_capacity = (ns->nr_running < ns->task_capacity);
 }
@@ -1990,6 +1994,7 @@ static void update_task_scan_period(struct task_struct *p,
 	ratio = (local * NUMA_PERIOD_SLOTS) / (local + remote);
 	if (ratio >= NUMA_PERIOD_THRESHOLD) {
 		int slot = ratio - NUMA_PERIOD_THRESHOLD;
+
 		if (!slot)
 			slot = 1;
 		diff = slot * period_slot;
@@ -2102,6 +2107,7 @@ static int preferred_group_nid(struct task_struct *p, int nid)
 		for_each_node_mask(a, nodes) {
 			unsigned long faults = 0;
 			nodemask_t this_group;
+
 			nodes_clear(this_group);
 
 			/* Sum group's NUMA faults; includes a==b case. */
@@ -2616,6 +2622,7 @@ out:
 	 */
 	if (unlikely(p->se.sum_exec_runtime != runtime)) {
 		u64 diff = p->se.sum_exec_runtime - runtime;
+
 		p->node_stamp += 32 * diff;
 	}
 }
@@ -2809,14 +2816,14 @@ EXPORT_SYMBOL(sched_set_wake_up_idle);
 /* Precomputed fixed inverse multiplies for multiplication by y^n */
 static const u32 runnable_avg_yN_inv[] = {
 #ifdef CONFIG_PELT_HALFLIFE_32
-	0xffffffff,0xfa83b2da,0xf5257d14,0xefe4b99a,
-	0xeac0c6e6,0xe5b906e6,0xe0ccdeeb,0xdbfbb796,
-	0xd744fcc9,0xd2a81d91,0xce248c14,0xc9b9bd85,
-	0xc5672a10,0xc12c4cc9,0xbd08a39e,0xb8fbaf46,
-	0xb504f333,0xb123f581,0xad583ee9,0xa9a15ab4,
-	0xa5fed6a9,0xa2704302,0x9ef5325f,0x9b8d39b9,
-	0x9837f050,0x94f4efa8,0x91c3d373,0x8ea4398a,
-	0x8b95c1e3,0x88980e80,0x85aac367,0x82cd8698,
+	0xffffffff, 0xfa83b2da, 0xf5257d14, 0xefe4b99a,
+	0xeac0c6e6, 0xe5b906e6, 0xe0ccdeeb, 0xdbfbb796,
+	0xd744fcc9, 0xd2a81d91, 0xce248c14, 0xc9b9bd85,
+	0xc5672a10, 0xc12c4cc9, 0xbd08a39e, 0xb8fbaf46,
+	0xb504f333, 0xb123f581, 0xad583ee9, 0xa9a15ab4,
+	0xa5fed6a9, 0xa2704302, 0x9ef5325f, 0x9b8d39b9,
+	0x9837f050, 0x94f4efa8, 0x91c3d373, 0x8ea4398a,
+	0x8b95c1e3, 0x88980e80, 0x85aac367, 0x82cd8698,
 #endif
 #ifdef CONFIG_PELT_HALFLIFE_16
 	0xffffffff, 0xf5257d14, 0xeac0c6e6, 0xe0ccdeeb,
@@ -2836,8 +2843,8 @@ static const u32 runnable_avg_yN_inv[] = {
  */
 static const u32 runnable_avg_yN_sum[] = {
 	    0, 1002, 1982, 2941, 3880, 4798, 5697, 6576, 7437, 8279, 9103,
-	 9909,10698,11470,12226,12966,13690,14398,15091,15769,16433,17082,
-	17718,18340,18949,19545,20128,20698,21256,21802,22336,22859,23371,
+	 9909, 10698, 11470, 12226, 12966, 13690, 14398, 15091, 15769, 16433, 17082,
+	17718, 18340, 18949, 19545, 20128, 20698, 21256, 21802, 22336, 22859, 23371,
 };
 
 /*
@@ -3394,6 +3401,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
 
 	if (atomic_long_read(&cfs_rq->removed_load_avg)) {
 		s64 r = atomic_long_xchg(&cfs_rq->removed_load_avg, 0);
+
 		sub_positive(&sa->load_avg, r);
 		sub_positive(&sa->load_sum, r * LOAD_AVG_MAX);
 		removed_load = 1;
@@ -3402,6 +3410,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
 
 	if (atomic_long_read(&cfs_rq->removed_util_avg)) {
 		long r = atomic_long_xchg(&cfs_rq->removed_util_avg, 0);
+
 		sub_positive(&sa->util_avg, r);
 		sub_positive(&sa->util_sum, r * LOAD_AVG_MAX);
 		removed_util = 1;
@@ -3815,10 +3824,8 @@ static inline void check_schedstat_required(void)
 			trace_sched_stat_iowait_enabled()  ||
 			trace_sched_stat_blocked_enabled() ||
 			trace_sched_stat_runtime_enabled())  {
-		printk_deferred_once("Scheduler tracepoints stat_sleep, stat_iowait, "
-			     "stat_blocked and stat_runtime require the "
-			     "kernel parameter schedstats=enabled or "
-			     "kernel.sched_schedstats=1\n");
+		printk_deferred_once("Scheduler tracepoints stat_sleep, stat_iowait, stat_blocked and stat_runtime require the "
+			     "kernel parameter schedstats=enabled or kernel.sched_schedstats=1\n");
 	}
 #endif
 }
@@ -3911,6 +3918,7 @@ static void __clear_buddies_last(struct sched_entity *se)
 {
 	for_each_sched_entity(se) {
 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
+
 		if (cfs_rq->last != se)
 			break;
 
@@ -3922,6 +3930,7 @@ static void __clear_buddies_next(struct sched_entity *se)
 {
 	for_each_sched_entity(se) {
 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
+
 		if (cfs_rq->next != se)
 			break;
 
@@ -3933,6 +3942,7 @@ static void __clear_buddies_skip(struct sched_entity *se)
 {
 	for_each_sched_entity(se) {
 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
+
 		if (cfs_rq->skip != se)
 			break;
 
@@ -4890,10 +4900,10 @@ static enum hrtimer_restart sched_cfs_period_timer(struct hrtimer *timer)
 			cfs_b->quota = div64_u64(cfs_b->quota, old);
 
 			pr_warn_ratelimited(
-        "cfs_period_timer[cpu%d]: period too short, scaling up (new cfs_period_us %lld, cfs_quota_us = %lld)\n",
-	                        smp_processor_id(),
-	                        div_u64(new, NSEC_PER_USEC),
-                                div_u64(cfs_b->quota, NSEC_PER_USEC));
+	"cfs_period_timer[cpu%d]: period too short, scaling up (new cfs_period_us %lld, cfs_quota_us = %lld)\n",
+				smp_processor_id(),
+				div_u64(new, NSEC_PER_USEC),
+				div_u64(cfs_b->quota, NSEC_PER_USEC));
 
 			/* reset count so we don't come right back in here */
 			count = 0;
@@ -6051,6 +6061,7 @@ static int group_idle_state(struct energy_env *eenv, int cpu_idx)
 		 */
 		int max_idle_state_idx = sg->sge->nr_idle_states - 2;
 		int new_state = grp_util * max_idle_state_idx;
+
 		if (grp_util <= 0)
 			/* group will have no util, use lowest state */
 			new_state = max_idle_state_idx + 1;
@@ -6742,6 +6753,7 @@ find_idlest_group_cpu(struct sched_group *group, struct task_struct *p, int this
 		if (idle_cpu(i)) {
 			struct rq *rq = cpu_rq(i);
 			struct cpuidle_state *idle = idle_get_state(rq);
+
 			if (idle && idle->exit_latency < min_exit_latency) {
 				/*
 				 * We give priority to a CPU whose idle state
@@ -7032,15 +7044,15 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 			return target;
 
 		i = select_idle_core(p, sd, target);
-		if ((unsigned)i < nr_cpumask_bits)
+		if ((unsigned int)i < nr_cpumask_bits)
 			return i;
 
 		i = select_idle_cpu(p, sd, target);
-		if ((unsigned)i < nr_cpumask_bits)
+		if ((unsigned int)i < nr_cpumask_bits)
 			return i;
 
 		i = select_idle_smt(p, sd, target);
-		if ((unsigned)i < nr_cpumask_bits)
+		if ((unsigned int)i < nr_cpumask_bits)
 			return i;
 	}
 
@@ -7052,7 +7064,7 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 		sg = sd->groups;
 		do {
 			if (!cpumask_intersects(sched_group_cpus(sg),
-                                        tsk_cpus_allowed(p)))
+					tsk_cpus_allowed(p)))
 				goto next;
 
 
@@ -7609,13 +7621,14 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 /*
  * Disable WAKE_AFFINE in the case where task @p doesn't fit in the
  * capacity of either the waking CPU @cpu or the previous CPU @prev_cpu.
- * 
+ *
  * In that case WAKE_AFFINE doesn't make sense and we'll let
  * BALANCE_WAKE sort things out.
  */
 static int wake_cap(struct task_struct *p, int cpu, int prev_cpu)
 {
 	long min_cap, max_cap;
+
 	min_cap = min(capacity_orig_of(prev_cpu), capacity_orig_of(cpu));
 	max_cap = cpu_rq(cpu)->rd->max_cpu_capacity.val;
 	/* Minimum capacity is close to max, no need to abort wake_affine */
@@ -7664,6 +7677,7 @@ cpu_is_in_target_set(struct task_struct *p, int cpu, struct cpumask *rtg_target)
 {
 	int first_cpu = start_cpu(p, task_is_boosted(p), rtg_target);
 	int next_usable_cpu = cpumask_next(first_cpu - 1, tsk_cpus_allowed(p));
+
 	return cpu >= next_usable_cpu || next_usable_cpu >= nr_cpu_ids;
 }
 
@@ -8827,7 +8841,7 @@ static struct task_struct *hisi_get_heaviest_task(
 {
 	int num_tasks = 5;
 	struct sched_entity *se = &p->se;
-	unsigned long int max_util = task_util(p), max_preferred_util= 0, util;
+	unsigned long int max_util = task_util(p), max_preferred_util = 0, util;
 	struct task_struct *tsk, *max_preferred_tsk = NULL, *max_util_task = p;
 	bool boosted, prefer_idle;
 
@@ -8843,7 +8857,7 @@ static struct task_struct *hisi_get_heaviest_task(
 
 		tsk = task_of(se);
 		util = boosted_task_util(tsk);
-		
+
 #ifdef CONFIG_CGROUP_SCHEDTUNE
 		boosted = schedtune_task_boost(p) > 0;
 		prefer_idle = schedtune_prefer_idle(p) > 0;
@@ -9422,8 +9436,8 @@ check_cpu_capacity(struct rq *rq, struct sched_domain *sd)
  * cpumask covering 1 cpu of the first group and 3 cpus of the second group.
  * Something like:
  *
- * 	{ 0 1 2 3 } { 4 5 6 7 }
- * 	        *     * * *
+ *	{ 0 1 2 3 } { 4 5 6 7 }
+ *	        *     * * *
  *
  * If we were to balance group-wise we'd place two tasks in the first group and
  * two tasks in the second group. Clearly this is undesired as it will overload
@@ -11851,10 +11865,10 @@ int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent)
 	struct cfs_rq *cfs_rq;
 	int i;
 
-	tg->cfs_rq = kzalloc(sizeof(cfs_rq) * nr_cpu_ids, GFP_KERNEL);
+	tg->cfs_rq = kcalloc(nr_cpu_ids, sizeof(cfs_rq), GFP_KERNEL);
 	if (!tg->cfs_rq)
 		goto err;
-	tg->se = kzalloc(sizeof(se) * nr_cpu_ids, GFP_KERNEL);
+	tg->se = kcalloc(nr_cpu_ids, sizeof(se), GFP_KERNEL);
 	if (!tg->se)
 		goto err;
 
