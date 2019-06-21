@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, 2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -329,6 +329,54 @@ TRACE_EVENT(mm_page_alloc_extfrag,
 		__entry->change_ownership)
 );
 
+TRACE_EVENT(ion_heap_shrink,
+
+	TP_PROTO(const char *heap_name,
+		 size_t len,
+		 long total_allocated),
+
+	TP_ARGS(heap_name, len, total_allocated),
+
+	TP_STRUCT__entry(
+		__string(heap_name, heap_name)
+		__field(size_t, len)
+		__field(long, total_allocated)
+	),
+
+	TP_fast_assign(
+		__assign_str(heap_name, heap_name);
+		__entry->len = len;
+		__entry->total_allocated = total_allocated;
+	),
+
+	TP_printk("heap_name=%s, len=%zu, total_allocated=%ld",
+		  __get_str(heap_name), __entry->len, __entry->total_allocated)
+);
+
+TRACE_EVENT(ion_heap_grow,
+
+	TP_PROTO(const char *heap_name,
+		 size_t len,
+		 long total_allocated),
+
+	TP_ARGS(heap_name, len, total_allocated),
+
+	TP_STRUCT__entry(
+		__string(heap_name, heap_name)
+		__field(size_t, len)
+		__field(long, total_allocated)
+	),
+
+	TP_fast_assign(
+		__assign_str(heap_name, heap_name);
+		__entry->len = len;
+		__entry->total_allocated = total_allocated;
+	),
+
+	TP_printk("heap_name=%s, len=%zu, total_allocated=%ld",
+		  __get_str(heap_name), __entry->len, __entry->total_allocated)
+	);
+
 
 DECLARE_EVENT_CLASS(ion_alloc,
 
@@ -336,51 +384,32 @@ DECLARE_EVENT_CLASS(ion_alloc,
 		 const char *heap_name,
 		 size_t len,
 		 unsigned int mask,
-		 unsigned int flags,
-		 pid_t client_pid,
-		 char *current_comm,
-		 pid_t current_pid,
-		 void *buffer),
+		 unsigned int flags),
 
-	TP_ARGS(client_name, heap_name, len, mask, flags, client_pid,
-					current_comm, current_pid, buffer),
+	TP_ARGS(client_name, heap_name, len, mask, flags),
 
 	TP_STRUCT__entry(
 		__array(char,		client_name, 64)
-		__field(const char *,	heap_name)
+		__string(heap_name, heap_name)
 		__field(size_t,		len)
 		__field(unsigned int,	mask)
 		__field(unsigned int,	flags)
-		__field(pid_t,		client_pid)
-		__array(char,		current_comm, 16)
-		__field(pid_t,		current_pid)
-		__field(void *,		buffer)
 	),
 
 	TP_fast_assign(
 		strlcpy(__entry->client_name, client_name, 64);
-		__entry->heap_name	= heap_name;
+		__assign_str(heap_name, heap_name);
 		__entry->len		= len;
 		__entry->mask		= mask;
 		__entry->flags		= flags;
-		__entry->client_pid	= client_pid;
-		strlcpy(__entry->current_comm, current_comm, 16);
-		__entry->current_pid	= current_pid;
-		__entry->buffer		= buffer;
 	),
 
-	TP_printk("client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x "
-			"client_pid=%d current_comm=%s current_pid=%d "
-			"buffer=%pK",
+	TP_printk("client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x",
 		__entry->client_name,
-		__entry->heap_name,
+		__get_str(heap_name),
 		__entry->len,
 		__entry->mask,
-		__entry->flags,
-		__entry->client_pid,
-		__entry->current_comm,
-		__entry->current_pid,
-		__entry->buffer)
+		__entry->flags)
 );
 
 DEFINE_EVENT(ion_alloc, ion_alloc_buffer_start,
@@ -389,14 +418,9 @@ DEFINE_EVENT(ion_alloc, ion_alloc_buffer_start,
 		 const char *heap_name,
 		 size_t len,
 		 unsigned int mask,
-		 unsigned int flags,
-		 pid_t client_pid,
-		 char *current_comm,
-		 pid_t current_pid,
-		 void *buffer),
+		 unsigned int flags),
 
-	TP_ARGS(client_name, heap_name, len, mask, flags, client_pid,
-					current_comm, current_pid, buffer)
+	TP_ARGS(client_name, heap_name, len, mask, flags)
 );
 
 DEFINE_EVENT(ion_alloc, ion_alloc_buffer_end,
@@ -405,67 +429,9 @@ DEFINE_EVENT(ion_alloc, ion_alloc_buffer_end,
 		 const char *heap_name,
 		 size_t len,
 		 unsigned int mask,
-		 unsigned int flags,
-		 pid_t client_pid,
-		 char *current_comm,
-		 pid_t current_pid,
-		 void *buffer),
+		 unsigned int flags),
 
-	TP_ARGS(client_name, heap_name, len, mask, flags, client_pid,
-					current_comm, current_pid, buffer)
-);
-
-DECLARE_EVENT_CLASS(ion_free,
-
-	TP_PROTO(const char *client_name,
-		 pid_t client_pid,
-		 char *current_comm,
-		 pid_t current_pid,
-		 void *buffer,
-		 size_t size),
-
-	TP_ARGS(client_name, client_pid, current_comm, current_pid,
-							buffer, size),
-
-	TP_STRUCT__entry(
-		__array(char,		client_name, 64)
-		__field(pid_t,		client_pid)
-		__array(char,		current_comm, 16)
-		__field(pid_t,		current_pid)
-		__field(void *,	buffer)
-		__field(size_t,	size)
-	),
-
-	TP_fast_assign(
-		strlcpy(__entry->client_name, client_name, 64);
-		__entry->client_pid	= client_pid;
-		strlcpy(__entry->current_comm, current_comm, 16);
-		__entry->current_pid	= current_pid;
-		__entry->buffer		= buffer;
-		__entry->size		= size;
-	),
-
-	TP_printk("client_name=%s client_pid=%d current_comm=%s "
-				"current_pid=%d buffer=%pK size=%zu",
-		__entry->client_name,
-		__entry->client_pid,
-		__entry->current_comm,
-		__entry->current_pid,
-		__entry->buffer,
-		__entry->size)
-);
-
-DEFINE_EVENT(ion_free, ion_free_buffer,
-
-	TP_PROTO(const char *client_name,
-		 pid_t client_pid,
-		 char *current_comm,
-		 pid_t current_pid,
-		 void *buffer,
-		 size_t size),
-
-	TP_ARGS(client_name, client_pid, current_comm, current_pid,
-							buffer, size)
+	TP_ARGS(client_name, heap_name, len, mask, flags)
 );
 
 DECLARE_EVENT_CLASS(ion_alloc_error,
@@ -481,7 +447,7 @@ DECLARE_EVENT_CLASS(ion_alloc_error,
 
 	TP_STRUCT__entry(
 		__field(const char *,	client_name)
-		__field(const char *,	heap_name)
+		__string(heap_name, heap_name)
 		__field(size_t,		len)
 		__field(unsigned int,	mask)
 		__field(unsigned int,	flags)
@@ -490,7 +456,7 @@ DECLARE_EVENT_CLASS(ion_alloc_error,
 
 	TP_fast_assign(
 		__entry->client_name	= client_name;
-		__entry->heap_name	= heap_name;
+		__assign_str(heap_name, heap_name);
 		__entry->len		= len;
 		__entry->mask		= mask;
 		__entry->flags		= flags;
@@ -500,7 +466,7 @@ DECLARE_EVENT_CLASS(ion_alloc_error,
 	TP_printk(
 	"client_name=%s heap_name=%s len=%zu mask=0x%x flags=0x%x error=%ld",
 		__entry->client_name,
-		__entry->heap_name,
+		__get_str(heap_name),
 		__entry->len,
 		__entry->mask,
 		__entry->flags,
@@ -814,21 +780,21 @@ DECLARE_EVENT_CLASS(ion_secure_cma_allocate,
 	TP_ARGS(heap_name, len, align, flags),
 
 	TP_STRUCT__entry(
-		__field(const char *, heap_name)
+		__string(heap_name, heap_name)
 		__field(unsigned long, len)
 		__field(unsigned long, align)
 		__field(unsigned long, flags)
 		),
 
 	TP_fast_assign(
-		__entry->heap_name = heap_name;
+		__assign_str(heap_name, heap_name);
 		__entry->len = len;
 		__entry->align = align;
 		__entry->flags = flags;
 		),
 
 	TP_printk("heap_name=%s len=%lx align=%lx flags=%lx",
-		__entry->heap_name,
+		__get_str(heap_name),
 		__entry->len,
 		__entry->align,
 		__entry->flags)
@@ -862,21 +828,21 @@ DECLARE_EVENT_CLASS(ion_cp_secure_buffer,
 	TP_ARGS(heap_name, len, align, flags),
 
 	TP_STRUCT__entry(
-		__field(const char *, heap_name)
+		__string(heap_name, heap_name)
 		__field(unsigned long, len)
 		__field(unsigned long, align)
 		__field(unsigned long, flags)
 		),
 
 	TP_fast_assign(
-		__entry->heap_name = heap_name;
+		__assign_str(heap_name, heap_name);
 		__entry->len = len;
 		__entry->align = align;
 		__entry->flags = flags;
 		),
 
 	TP_printk("heap_name=%s len=%lx align=%lx flags=%lx",
-		__entry->heap_name,
+		__get_str(heap_name),
 		__entry->len,
 		__entry->align,
 		__entry->flags)
@@ -954,6 +920,28 @@ DEFINE_EVENT(iommu_sec_ptbl_map_range, iommu_sec_ptbl_map_range_end,
 		size_t len),
 
 	TP_ARGS(sec_id, num, va, pa, len)
+	);
+
+TRACE_EVENT(rss_stat,
+
+	TP_PROTO(int member,
+		long count),
+
+	TP_ARGS(member, count),
+
+	TP_STRUCT__entry(
+		__field(int, member)
+		__field(long, size)
+	),
+
+	TP_fast_assign(
+		__entry->member = member;
+		__entry->size = (count << PAGE_SHIFT);
+	),
+
+	TP_printk("member=%d size=%ldB",
+		__entry->member,
+		__entry->size)
 	);
 #endif /* _TRACE_KMEM_H */
 

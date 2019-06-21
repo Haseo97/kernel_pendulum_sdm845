@@ -38,6 +38,25 @@
 #include "compat_msm_ion.h"
 #include <soc/qcom/secure_buffer.h>
 
+#ifdef CONFIG_CFI_CLANG
+static inline void __cfi_dma_flush_area(const void *p, size_t s)
+{
+	__dma_flush_area(p, s);
+}
+static inline void __cfi_dma_inv_area(const void *p, size_t s)
+{
+	__dma_inv_area(p, s);
+}
+static inline void __cfi_dma_clean_area(const void *p, size_t s)
+{
+	__dma_clean_area(p, s);
+}
+
+#define __dma_flush_area __cfi_dma_flush_area
+#define __dma_inv_area __cfi_dma_inv_area
+#define __dma_clean_area __cfi_dma_clean_area
+#endif
+
 #define ION_COMPAT_STR	"qcom,msm-ion"
 
 static struct ion_device *idev;
@@ -791,16 +810,13 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 		struct mm_struct *mm = current->active_mm;
 
 		if (data.flush_data.handle > 0) {
-			mutex_lock(&client->lock);
-			handle = ion_handle_get_by_id_nolock(
+			handle = ion_handle_get_by_id(
 					client, (int)data.flush_data.handle);
 			if (IS_ERR(handle)) {
-				mutex_unlock(&client->lock);
 				pr_info("%s: Could not find handle: %d\n",
 					__func__, (int)data.flush_data.handle);
 				return PTR_ERR(handle);
 			}
-			mutex_unlock(&client->lock);
 		} else {
 			handle = ion_import_dma_buf_fd(client,
 						       data.flush_data.fd);
@@ -935,17 +951,8 @@ int msm_ion_heap_alloc_pages_mem(struct pages_mem *pages_mem)
 	pages_mem->free_fn = kfree;
 	page_tbl_size = sizeof(struct page *) * (pages_mem->size >> PAGE_SHIFT);
 	if (page_tbl_size > SZ_8K) {
-		/*
-		 * Do fallback to ensure we have a balance between
-		 * performance and availability.
-		 */
-		pages = kmalloc(page_tbl_size,
-				__GFP_COMP | __GFP_NORETRY |
-				__GFP_NOWARN);
-		if (!pages) {
-			pages = vmalloc(page_tbl_size);
-			pages_mem->free_fn = vfree;
-		}
+		pages = vmalloc(page_tbl_size);
+		pages_mem->free_fn = vfree;
 	} else {
 		pages = kmalloc(page_tbl_size, GFP_KERNEL);
 	}
