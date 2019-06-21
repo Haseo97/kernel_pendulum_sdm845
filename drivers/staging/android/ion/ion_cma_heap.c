@@ -81,8 +81,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	struct device *dev = heap->priv;
 	struct ion_cma_buffer_info *info;
 
-	dev_dbg(dev, "Request buffer allocation len %ld\n", len);
-
 	info = kzalloc(sizeof(struct ion_cma_buffer_info), GFP_KERNEL);
 	if (!info)
 		return ION_CMA_ALLOCATE_FAILED;
@@ -123,7 +121,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 
 	/* keep this for memory release */
 	buffer->priv_virt = info;
-	dev_dbg(dev, "Allocate buffer %pK\n", buffer);
 	return 0;
 
 free_mem:
@@ -131,7 +128,8 @@ free_mem:
 		dma_free_writecombine(dev, len, info->cpu_addr, info->handle);
 	else
 		dma_free_attrs(dev, len, info->cpu_addr, info->handle,
-			       DMA_ATTR_FORCE_COHERENT);
+			DMA_ATTR_FORCE_COHERENT);
+
 err:
 	kfree(info);
 	return ION_CMA_ALLOCATE_FAILED;
@@ -143,7 +141,6 @@ static void ion_cma_free(struct ion_buffer *buffer)
 	struct ion_cma_buffer_info *info = buffer->priv_virt;
 	unsigned long attrs = 0;
 
-	dev_dbg(dev, "Release buffer %pK\n", buffer);
 	/* release memory */
 	if (info->is_cached)
 		attrs |= DMA_ATTR_FORCE_COHERENT;
