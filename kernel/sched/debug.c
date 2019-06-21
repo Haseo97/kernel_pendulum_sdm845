@@ -61,7 +61,7 @@ static unsigned long nsec_low(unsigned long long nsec)
 #define SPLIT_NS(x) nsec_high(x), nsec_low(x)
 
 #define SCHED_FEAT(name, enabled)	\
-	#name ,
+	#name,
 
 static const char * const sched_feat_names[] = {
 #include "features.h"
@@ -89,7 +89,7 @@ static int sched_feat_show(struct seq_file *m, void *v)
 #define jump_label_key__false STATIC_KEY_INIT_FALSE
 
 #define SCHED_FEAT(name, enabled)	\
-	jump_label_key__##enabled ,
+	jump_label_key__##enabled,
 
 struct static_key sched_feat_keys[__SCHED_FEAT_NR] = {
 #include "features.h"
@@ -240,7 +240,7 @@ static void sd_free_ctl_entry(struct ctl_table **tablep)
 	*tablep = NULL;
 }
 
-static int min_load_idx = 0;
+static int min_load_idx;
 static int max_load_idx = CPU_LOAD_IDX_MAX-1;
 
 static void
@@ -521,10 +521,8 @@ static void print_rq(struct seq_file *m, struct rq *rq, int rq_cpu)
 
 	SEQ_printf(m,
 	"\nrunnable tasks:\n"
-	" S           task   PID         tree-key  switches  prio"
-	"     wait-time             sum-exec        sum-sleep\n"
-	"-------------------------------------------------------"
-	"----------------------------------------------------\n");
+	" S           task   PID         tree-key  switches  prio     wait-time             sum-exec        sum-sleep\n"
+	"-----------------------------------------------------------------------------------------------------------\n");
 
 	rcu_read_lock();
 	for_each_process_thread(g, p) {
@@ -960,8 +958,7 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 	SEQ_printf(m, "%s (%d, #threads: %d)\n", p->comm, task_pid_nr(p),
 						get_nr_threads(p));
 	SEQ_printf(m,
-		"---------------------------------------------------------"
-		"----------\n");
+		"-------------------------------------------------------------------\n");
 #define __P(F) \
 	SEQ_printf(m, "%-45s:%21Ld\n", #F, (long long)F)
 #define P(F) \
@@ -1039,7 +1036,7 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 		/* select_task_rq_fair() */
 		P_SCHEDSTAT(se.statistics.nr_wakeups_cas_attempts);
 		P_SCHEDSTAT(se.statistics.nr_wakeups_cas_count);
- 
+
 #ifdef CONFIG_SCHED_WALT
 		P(ravg.demand);
 #endif

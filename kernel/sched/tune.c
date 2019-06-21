@@ -15,7 +15,7 @@
 unsigned int sysctl_sched_cfs_boost __read_mostly;
 
 #ifdef CONFIG_CGROUP_SCHEDTUNE
-bool schedtune_initialized = false;
+bool schedtune_initialized;
 #endif
 
 unsigned int sysctl_sched_cfs_boost __read_mostly;
@@ -377,7 +377,7 @@ struct boost_groups {
 		/* The boost for tasks on that boost group */
 		int boost;
 		/* Count of RUNNABLE tasks on that boost group */
-		unsigned tasks;
+		unsigned int tasks;
 		/* Timestamp of boost activation */
 		u64 ts;
 	} group[BOOSTGROUPS_COUNT];
@@ -465,7 +465,7 @@ static inline bool schedtune_boost_timeout(u64 now, u64 ts)
 }
 
 static inline bool
-schedtune_boost_group_active(int idx, struct boost_groups* bg, u64 now)
+schedtune_boost_group_active(int idx, struct boost_groups *bg, u64 now)
 {
 	if (bg->group[idx].tasks)
 		return true;
@@ -900,6 +900,7 @@ prefer_idle_write(struct cgroup_subsys_state *css, struct cftype *cft,
 	    u64 prefer_idle)
 {
 	struct schedtune *st = css_st(css);
+
 	st->prefer_idle = !!prefer_idle;
 
 	return 0;
@@ -941,7 +942,7 @@ boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 	    s64 boost)
 {
 	struct schedtune *st = css_st(css);
-	unsigned threshold_idx;
+	unsigned int threshold_idx;
 	int boost_pct;
 
 	if (boost < -100 || boost > 100)
@@ -990,6 +991,7 @@ sched_boost_write(struct cgroup_subsys_state *css, struct cftype *cft,
 	    s64 sched_boost)
 {
 	struct schedtune *st = css_st(css);
+
 	st->sched_boost = sched_boost;
 
 	return 0;
@@ -1337,6 +1339,7 @@ static int max_active_boost(struct schedtune *st)
 	/* Get largest boost value */
 	list_for_each_entry(slot, &(st->active_boost_slots.list), list) {
 		int boost = st->slot_boost[slot->idx];
+
 		if (boost > max_boost)
 			max_boost = boost;
 	}
@@ -1455,7 +1458,7 @@ sysctl_sched_cfs_boost_handler(struct ctl_table *table, int write,
 			       loff_t *ppos)
 {
 	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-	unsigned threshold_idx;
+	unsigned int threshold_idx;
 	int boost_pct;
 
 	if (ret || !write)
@@ -1628,7 +1631,7 @@ schedtune_init(void)
 	return 0;
 
 nodata:
-	pr_warning("schedtune: disabled!\n");
+	pr_warn("schedtune: disabled!\n");
 	rcu_read_unlock();
 	return -EINVAL;
 }

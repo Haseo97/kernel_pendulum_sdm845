@@ -1325,7 +1325,7 @@ static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 extern const_debug unsigned int sysctl_sched_features;
 
 #define SCHED_FEAT(name, enabled)	\
-	__SCHED_FEAT_##name ,
+	__SCHED_FEAT_##name,
 
 enum {
 #include "features.h"
@@ -1503,12 +1503,12 @@ extern const u32 sched_prio_to_wmult[40];
 struct sched_class {
 	const struct sched_class *next;
 
-	void (*enqueue_task) (struct rq *rq, struct task_struct *p, int flags);
-	void (*dequeue_task) (struct rq *rq, struct task_struct *p, int flags);
-	void (*yield_task) (struct rq *rq);
-	bool (*yield_to_task) (struct rq *rq, struct task_struct *p, bool preempt);
+	void (*enqueue_task)(struct rq *rq, struct task_struct *p, int flags);
+	void (*dequeue_task)(struct rq *rq, struct task_struct *p, int flags);
+	void (*yield_task)(struct rq *rq);
+	bool (*yield_to_task)(struct rq *rq, struct task_struct *p, bool preempt);
 
-	void (*check_preempt_curr) (struct rq *rq, struct task_struct *p, int flags);
+	void (*check_preempt_curr)(struct rq *rq, struct task_struct *p, int flags);
 
 	/*
 	 * It is the responsibility of the pick_next_task() method that will
@@ -1518,16 +1518,16 @@ struct sched_class {
 	 * May return RETRY_TASK when it finds a higher prio class has runnable
 	 * tasks.
 	 */
-	struct task_struct * (*pick_next_task) (struct rq *rq,
+	struct task_struct * (*pick_next_task)(struct rq *rq,
 						struct task_struct *prev,
 						struct rq_flags *rf);
-	void (*put_prev_task) (struct rq *rq, struct task_struct *p);
+	void (*put_prev_task)(struct rq *rq, struct task_struct *p);
 
 #ifdef CONFIG_SMP
 	int  (*select_task_rq)(struct task_struct *p, int task_cpu, int sd_flag, int flags);
 	void (*migrate_task_rq)(struct task_struct *p);
 
-	void (*task_woken) (struct rq *this_rq, struct task_struct *task);
+	void (*task_woken)(struct rq *this_rq, struct task_struct *task);
 
 	void (*set_cpus_allowed)(struct task_struct *p,
 				 const struct cpumask *newmask);
@@ -1536,31 +1536,31 @@ struct sched_class {
 	void (*rq_offline)(struct rq *rq);
 #endif
 
-	void (*set_curr_task) (struct rq *rq);
-	void (*task_tick) (struct rq *rq, struct task_struct *p, int queued);
-	void (*task_fork) (struct task_struct *p);
-	void (*task_dead) (struct task_struct *p);
+	void (*set_curr_task)(struct rq *rq);
+	void (*task_tick)(struct rq *rq, struct task_struct *p, int queued);
+	void (*task_fork)(struct task_struct *p);
+	void (*task_dead)(struct task_struct *p);
 
 	/*
 	 * The switched_from() call is allowed to drop rq->lock, therefore we
 	 * cannot assume the switched_from/switched_to pair is serliazed by
 	 * rq->lock. They are however serialized by p->pi_lock.
 	 */
-	void (*switched_from) (struct rq *this_rq, struct task_struct *task);
-	void (*switched_to) (struct rq *this_rq, struct task_struct *task);
-	void (*prio_changed) (struct rq *this_rq, struct task_struct *task,
+	void (*switched_from)(struct rq *this_rq, struct task_struct *task);
+	void (*switched_to)(struct rq *this_rq, struct task_struct *task);
+	void (*prio_changed)(struct rq *this_rq, struct task_struct *task,
 			     int oldprio);
 
-	unsigned int (*get_rr_interval) (struct rq *rq,
+	unsigned int (*get_rr_interval)(struct rq *rq,
 					 struct task_struct *task);
 
-	void (*update_curr) (struct rq *rq);
+	void (*update_curr)(struct rq *rq);
 
 #define TASK_SET_GROUP  0
 #define TASK_MOVE_GROUP	1
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	void (*task_change_group) (struct task_struct *p, int type);
+	void (*task_change_group)(struct task_struct *p, int type);
 #endif
 #ifdef CONFIG_SCHED_WALT
 	void (*fixup_walt_sched_stats)(struct rq *rq, struct task_struct *p,
@@ -1706,9 +1706,9 @@ static inline void sched_update_tick_dependency(struct rq *rq)
 static inline void sched_update_tick_dependency(struct rq *rq) { }
 #endif
 
-static inline void __add_nr_running(struct rq *rq, unsigned count)
+static inline void __add_nr_running(struct rq *rq, unsigned int count)
 {
-	unsigned prev_nr = rq->nr_running;
+	unsigned int prev_nr = rq->nr_running;
 
 	sched_update_nr_prod(cpu_of(rq), count, true);
 	rq->nr_running = prev_nr + count;
@@ -1723,7 +1723,7 @@ static inline void __add_nr_running(struct rq *rq, unsigned count)
 	sched_update_tick_dependency(rq);
 }
 
-static inline void __sub_nr_running(struct rq *rq, unsigned count)
+static inline void __sub_nr_running(struct rq *rq, unsigned int count)
 {
 	sched_update_nr_prod(cpu_of(rq), count, false);
 	rq->nr_running -= count;
@@ -1746,7 +1746,7 @@ static inline u64 do_nr_running_integral(struct rq *rq)
 	return nr_running_integral;
 }
 
-static inline void add_nr_running(struct rq *rq, unsigned count)
+static inline void add_nr_running(struct rq *rq, unsigned int count)
 {
 	write_seqcount_begin(&rq->ave_seqcnt);
 	rq->nr_running_integral = do_nr_running_integral(rq);
@@ -1755,7 +1755,7 @@ static inline void add_nr_running(struct rq *rq, unsigned count)
 	write_seqcount_end(&rq->ave_seqcnt);
 }
 
-static inline void sub_nr_running(struct rq *rq, unsigned count)
+static inline void sub_nr_running(struct rq *rq, unsigned int count)
 {
 	write_seqcount_begin(&rq->ave_seqcnt);
 	rq->nr_running_integral = do_nr_running_integral(rq);

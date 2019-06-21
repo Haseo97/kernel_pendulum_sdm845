@@ -111,6 +111,7 @@ bool su_running(void)
 bool su_visible(void)
 {
 	kuid_t uid = current_uid();
+
 	if (su_running())
 		return true;
 	if (uid_eq(uid, GLOBAL_ROOT_UID) || uid_eq(uid, GLOBAL_SYSTEM_UID))
@@ -419,6 +420,7 @@ static inline void init_rq_hrtick(struct rq *rq)
 static bool set_nr_and_not_polling(struct task_struct *p)
 {
 	struct thread_info *ti = task_thread_info(p);
+
 	return !(fetch_or(&ti->flags, _TIF_NEED_RESCHED) & _TIF_POLLING_NRFLAG);
 }
 
@@ -2263,8 +2265,8 @@ static void try_to_wake_up_local(struct task_struct *p, struct rq_flags *rf)
 	struct rq *rq = task_rq(p);
 
 	if (rq != this_rq() || p == current) {
-		printk_deferred("%s: Failed to wakeup task %d (%s), rq = %p,"
-			" this_rq = %p, p = %p, current = %p\n", __func__,
+		printk_deferred("%s: Failed to wakeup task %d (%s), rq = %p, this_rq = %p, p = %p, current = %p\n",
+			__func__,
 			task_pid_nr(p), p->comm, rq, this_rq(), p, current);
 
 		return;
@@ -2459,7 +2461,7 @@ int sysctl_numa_balancing(struct ctl_table *table, int write,
 #ifdef CONFIG_SCHEDSTATS
 
 DEFINE_STATIC_KEY_FALSE(sched_schedstats);
-static bool __initdata __sched_schedstats = false;
+static bool __sched_schedstats __initdata;
 
 static void set_schedstats(bool enabled)
 {
@@ -2480,6 +2482,7 @@ void force_schedstat_enabled(void)
 static int __init setup_schedstats(char *str)
 {
 	int ret = 0;
+
 	if (!str)
 		goto out;
 
@@ -3136,6 +3139,7 @@ unsigned long nr_iowait(void)
 unsigned long nr_iowait_cpu(int cpu)
 {
 	struct rq *this = cpu_rq(cpu);
+
 	return atomic_read(&this->nr_iowait);
 }
 
@@ -3756,6 +3760,7 @@ asmlinkage __visible void __sched schedule_user(void)
 	 * too frequently to make sense yet.
 	 */
 	enum ctx_state prev_state = exception_enter();
+
 	schedule();
 	exception_exit(prev_state);
 }
@@ -3902,7 +3907,7 @@ asmlinkage __visible void __sched preempt_schedule_irq(void)
 	exception_exit(prev_state);
 }
 
-int default_wake_function(wait_queue_t *curr, unsigned mode, int wake_flags,
+int default_wake_function(wait_queue_t *curr, unsigned int mode, int wake_flags,
 			  void *key)
 {
 	return try_to_wake_up(curr->private, mode, wake_flags);
@@ -3976,6 +3981,7 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	 */
 	if (dl_prio(prio)) {
 		struct task_struct *pi_task = rt_mutex_get_top_task(p);
+
 		if (!dl_prio(p->normal_prio) ||
 		    (pi_task && dl_entity_preempt(&pi_task->dl, &p->dl))) {
 			p->dl.dl_boosted = 1;
@@ -5129,7 +5135,7 @@ long msm_sched_setaffinity(pid_t pid, struct cpumask *new_mask)
 	return sched_setaffinity(pid, new_mask);
 }
 
-static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
+static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned int len,
 			     struct cpumask *new_mask)
 {
 	if (len < cpumask_size())
@@ -5333,7 +5339,7 @@ EXPORT_SYMBOL(__cond_resched_softirq);
  * Typical broken usage is:
  *
  * while (!event)
- * 	yield();
+ *	yield();
  *
  * where one assumes that yield() will let 'the other' process run that will
  * make event true. If the current task is a SCHED_FIFO task that will never
@@ -5576,7 +5582,7 @@ void sched_show_task(struct task_struct *p)
 		task_pid_nr(p), ppid,
 		(unsigned long)task_thread_info(p)->flags);
 
-	print_worker_info(KERN_INFO, p);
+	print_worker_info(KERN_INFO ,p);
 	show_stack(p, NULL);
 	put_task_stack(p);
 }
@@ -5852,6 +5858,7 @@ void idle_task_exit(void)
 static void calc_load_migrate(struct rq *rq)
 {
 	long delta = calc_load_fold_active(rq, 1);
+
 	if (delta)
 		atomic_long_add(delta, &calc_load_tasks);
 }
@@ -6318,12 +6325,12 @@ static int sched_domain_debug_one(struct sched_domain *sd, int cpu, int level,
 	       cpumask_pr_args(sched_domain_span(sd)), sd->name);
 
 	if (!cpumask_test_cpu(cpu, sched_domain_span(sd))) {
-		printk(KERN_ERR "ERROR: domain->span does not contain "
-				"CPU%d\n", cpu);
+		printk(KERN_ERR "ERROR: domain->span does not contain CPU%d\n",
+				cpu);
 	}
 	if (!cpumask_test_cpu(cpu, sched_group_cpus(group))) {
-		printk(KERN_ERR "ERROR: domain->groups does not contain"
-				" CPU%d\n", cpu);
+		printk(KERN_ERR "ERROR: domain->groups does not contain CPU%d\n",
+				cpu);
 	}
 
 	printk(KERN_DEBUG "%*s groups:", level + 1, "");
@@ -6365,8 +6372,7 @@ static int sched_domain_debug_one(struct sched_domain *sd, int cpu, int level,
 
 	if (sd->parent &&
 	    !cpumask_subset(groupmask, sched_domain_span(sd->parent)))
-		printk(KERN_ERR "ERROR: parent span is not a superset "
-			"of domain->span\n");
+		printk(KERN_ERR "ERROR: parent span is not a superset of domain->span\n");
 	return 0;
 }
 
@@ -6647,6 +6653,7 @@ static void destroy_sched_domains_rcu(struct rcu_head *rcu)
 
 	while (sd) {
 		struct sched_domain *parent = sd->parent;
+
 		destroy_sched_domain(sd);
 		sd = parent;
 	}
@@ -6728,6 +6735,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
 	/* Remove the sched domains which do not contribute to scheduling. */
 	for (tmp = sd; tmp; ) {
 		struct sched_domain *parent = tmp->parent;
+
 		if (!parent)
 			break;
 
@@ -7388,8 +7396,8 @@ static const struct cpumask *sd_numa_mask(int cpu)
 
 static void sched_numa_warn(const char *str)
 {
-	static int done = false;
-	int i,j;
+	static int done;
+	int i, j;
 
 	if (done)
 		return;
@@ -7401,7 +7409,7 @@ static void sched_numa_warn(const char *str)
 	for (i = 0; i < nr_node_ids; i++) {
 		printk(KERN_WARNING "  ");
 		for (j = 0; j < nr_node_ids; j++)
-			printk(KERN_CONT "%02d ", node_distance(i,j));
+			printk(KERN_CONT "%02d ", node_distance(i, j));
 		printk(KERN_CONT "\n");
 	}
 	printk(KERN_WARNING "\n");
@@ -7481,7 +7489,7 @@ static void sched_init_numa(void)
 	int level = 0;
 	int i, j, k;
 
-	sched_domains_numa_distance = kzalloc(sizeof(int) * nr_node_ids, GFP_KERNEL);
+	sched_domains_numa_distance = kcalloc(nr_node_ids, sizeof(int), GFP_KERNEL);
 	if (!sched_domains_numa_distance)
 		return;
 
@@ -7550,7 +7558,7 @@ static void sched_init_numa(void)
 	 */
 	sched_domains_numa_levels = 0;
 
-	sched_domains_numa_masks = kzalloc(sizeof(void *) * level, GFP_KERNEL);
+	sched_domains_numa_masks = kcalloc(level, sizeof(void *), GFP_KERNEL);
 	if (!sched_domains_numa_masks)
 		return;
 
@@ -7566,6 +7574,7 @@ static void sched_init_numa(void)
 
 		for (j = 0; j < nr_node_ids; j++) {
 			struct cpumask *mask = kzalloc(cpumask_size(), GFP_KERNEL);
+
 			if (!mask)
 				return;
 
@@ -7875,7 +7884,7 @@ cpumask_var_t *alloc_sched_domains(unsigned int ndoms)
 	int i;
 	cpumask_var_t *doms;
 
-	doms = kmalloc(sizeof(*doms) * ndoms, GFP_KERNEL);
+	doms = kmalloc_array(ndoms, sizeof(*doms), GFP_KERNEL);
 	if (!doms)
 		return NULL;
 	for (i = 0; i < ndoms; i++) {
@@ -7890,6 +7899,7 @@ cpumask_var_t *alloc_sched_domains(unsigned int ndoms)
 void free_sched_domains(cpumask_var_t doms[], unsigned int ndoms)
 {
 	unsigned int i;
+
 	for (i = 0; i < ndoms; i++)
 		free_cpumask_var(doms[i]);
 	kfree(doms);
