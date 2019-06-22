@@ -16,7 +16,7 @@
  * more details.
  *
  */
-#ifndef 	_LINUX_NVT_TOUCH_H
+#ifndef	_LINUX_NVT_TOUCH_H
 #define		_LINUX_NVT_TOUCH_H
 
 #include <linux/i2c.h>
@@ -168,7 +168,7 @@ struct nvt_mode_switch {
 };
 
 #if NVT_TOUCH_PROC
-struct nvt_flash_data{
+struct nvt_flash_data {
 	rwlock_t lock;
 	struct i2c_client *client;
 };

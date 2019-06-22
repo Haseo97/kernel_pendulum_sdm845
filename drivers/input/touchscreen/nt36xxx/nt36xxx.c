@@ -46,9 +46,9 @@
 #if NVT_TOUCH_ESD_PROTECT
 static struct delayed_work nvt_esd_check_work;
 static struct workqueue_struct *nvt_esd_check_wq;
-static unsigned long irq_timer = 0;
-uint8_t esd_check = false;
-uint8_t esd_retry = 0;
+static unsigned long irq_timer;
+uint8_t esd_check;
+uint8_t esd_retry;
 uint8_t esd_retry_max = 5;
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
 
@@ -120,7 +120,7 @@ const uint16_t gesture_key_array[] = {
 };
 #endif
 
-static uint8_t bTouchIsAwake = 0;
+static uint8_t bTouchIsAwake;
 
 /*******************************************************
 Description:
@@ -206,11 +206,11 @@ return:
 *******************************************************/
 void nvt_sw_reset_idle(void)
 {
-	uint8_t buf[4]={0};
+	uint8_t buf[4] = {0};
 
 	/*---write i2c cmds to reset idle---*/
-	buf[0]=0x00;
-	buf[1]=0xA5;
+	buf[0] = 0x00;
+	buf[1] = 0xA5;
 	CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 2);
 
 	msleep(15);
@@ -349,7 +349,7 @@ int32_t nvt_check_fw_reset_state(RST_COMPLETE_STATE check_reset_state)
 		}
 
 		retry++;
-		if(unlikely(retry > 100)) {
+		if (unlikely(retry > 100)) {
 			NVT_ERR("error, retry=%d, buf[1]=0x%02X, 0x%02X, 0x%02X, 0x%02X, 0x%02X\n", retry, buf[1], buf[2], buf[3], buf[4], buf[5]);
 			ret = -1;
 			break;
@@ -432,7 +432,7 @@ info_retry:
 		ts->abs_y_max = TOUCH_DEFAULT_MAX_HEIGHT;
 		ts->max_button_num = TOUCH_KEY_NUM;
 
-		if(retry_count < 3) {
+		if (retry_count < 3) {
 			retry_count++;
 			NVT_ERR("retry_count=%d\n", retry_count);
 			goto info_retry;
@@ -571,8 +571,7 @@ static int32_t nvt_flash_close(struct inode *inode, struct file *file)
 {
 	struct nvt_flash_data *dev = file->private_data;
 
-	if (dev)
-		kfree(dev);
+	kfree(dev);
 
 	return 0;
 }
@@ -593,7 +592,7 @@ return:
 *******************************************************/
 static int32_t nvt_flash_proc_init(void)
 {
-	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL,&nvt_flash_fops);
+	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL, &nvt_flash_fops);
 	if (NVT_proc_entry == NULL) {
 		NVT_ERR("Failed!\n");
 		return -ENOMEM;
@@ -775,7 +774,7 @@ static int nvt_parse_dt(struct device *dev)
 	}
 
 	retval = of_property_read_u32(np, "novatek,config-array-size",
-				 (u32 *) & ts->config_array_size);
+				 (u32 *) &ts->config_array_size);
 	if (retval) {
 		NVT_LOG("Unable to get array size\n");
 		return retval;
@@ -1025,7 +1024,7 @@ static uint8_t nvt_fw_recovery(uint8_t *point_data)
 	uint8_t detected = true;
 
 	/* check pattern */
-	for (i=1 ; i<7 ; i++) {
+	for (i = 1 ; i < 7 ; i++) {
 		if (point_data[i] != 0x77) {
 			detected = false;
 			break;
@@ -1314,13 +1313,13 @@ void nvt_stop_crc_reboot(void)
 		for (retry = 5; retry > 0; retry--) {
 
 			/*---write i2c cmds to reset idle : 1st---*/
-			buf[0]=0x00;
-			buf[1]=0xA5;
+			buf[0] = 0x00;
+			buf[1] = 0xA5;
 			CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 2);
 
 			/*---write i2c cmds to reset idle : 2rd---*/
-			buf[0]=0x00;
-			buf[1]=0xA5;
+			buf[0] = 0x00;
+			buf[1] = 0xA5;
 			CTP_I2C_WRITE(ts->client, I2C_HW_Address, buf, 2);
 			msleep(1);
 
@@ -1573,24 +1572,24 @@ err_pinctrl_get:
 static ssize_t nvt_panel_color_show(struct device *dev,
 				    struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[2]);
+	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[2]);
 }
 
 static ssize_t nvt_panel_vendor_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[6]);
+	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[6]);
 }
 
 static ssize_t nvt_panel_display_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[1]);
+	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[1]);
 }
 
-static DEVICE_ATTR(panel_vendor, (S_IRUGO), nvt_panel_vendor_show, NULL);
-static DEVICE_ATTR(panel_color, (S_IRUGO), nvt_panel_color_show, NULL);
-static DEVICE_ATTR(panel_display, (S_IRUGO), nvt_panel_display_show, NULL);
+static DEVICE_ATTR(panel_vendor, (0444), nvt_panel_vendor_show, NULL);
+static DEVICE_ATTR(panel_color, (0444), nvt_panel_color_show, NULL);
+static DEVICE_ATTR(panel_display, (0444), nvt_panel_display_show, NULL);
 
 static struct attribute *nvt_attr_group[] = {
 	&dev_attr_panel_vendor.attr,
@@ -1697,7 +1696,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->int_trigger_type = INT_TRIGGER_TYPE;
 
 	/*---set input device info.---*/
-	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS) ;
+	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
 	ts->input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
 
@@ -1726,12 +1725,12 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #endif
 
 #if WAKEUP_GESTURE
-	for (retry = 0; retry < (sizeof(gesture_key_array) / sizeof(gesture_key_array[0])); retry++) {
+	for (retry = 0; retry < (ARRAY_SIZE(gesture_key_array)); retry++) {
 		input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
 	}
 #endif
 
-	sprintf(ts->phys, "input/ts");
+	scnprintf(ts->phys, PAGE_SIZE, "input/ts");
 	ts->input_dev->name = NVT_TS_NAME;
 	ts->input_dev->phys = ts->phys;
 	ts->input_dev->id.bustype = BUS_I2C;
@@ -1834,7 +1833,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #if defined(CONFIG_DRM)
 	ts->notifier.notifier_call = drm_notifier_callback;
 	ret = drm_register_client(&ts->notifier);
-	if(ret) {
+	if (ret) {
 		NVT_ERR("register drm_notifier failed. ret=%d\n", ret);
 		goto err_register_drm_notif_failed;
 	}
@@ -1843,7 +1842,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->early_suspend.suspend = nvt_ts_early_suspend;
 	ts->early_suspend.resume = nvt_ts_late_resume;
 	ret = register_early_suspend(&ts->early_suspend);
-	if(ret) {
+	if (ret) {
 		NVT_ERR("register early suspend failed. ret=%d\n", ret);
 		goto err_register_early_suspend_failed;
 	}
