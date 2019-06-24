@@ -30,10 +30,6 @@ enum sched_boost_policy boost_policy;
 static enum sched_boost_policy boost_policy_dt = SCHED_BOOST_NONE;
 static DEFINE_MUTEX(boost_mutex);
 
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-static int boost_slot;
-#endif // CONFIG_DYNAMIC_STUNE_BOOST
-
 /*
  * Scheduler boost type and boost policy might at first seem unrelated,
  * however, there exists a connection between them that will allow us
@@ -72,14 +68,6 @@ static bool verify_boost_params(int type)
 
 static void sched_no_boost_nop(void)
 {
-
-#ifdef CONFIG_DYNAMIC_STUNE_BOOST
-	if (type > 0)
-		do_stune_sched_boost("top-app", &boost_slot);
-	else
-		reset_stune_boost("top-app", boost_slot);
-#endif // CONFIG_DYNAMIC_STUNE_BOOST
-
 }
 
 static void sched_full_throttle_boost_enter(void)
