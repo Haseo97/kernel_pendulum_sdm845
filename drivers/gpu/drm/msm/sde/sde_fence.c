@@ -17,6 +17,7 @@
 #include "sde_fence.h"
 
 #define TIMELINE_VAL_LENGTH		128
+static struct kmem_cache *sde_fence_cache;
 
 void *sde_sync_get(uint64_t fd)
 {
@@ -106,6 +107,7 @@ static void sde_fence_destroy(struct kref *kref)
 
 	ctx = container_of(kref, struct sde_fence_context, kref);
 	kfree(ctx);
+	kmem_cache_destroy(sde_fence_cache);
 }
 
 static inline struct sde_fence *to_sde_fence(struct fence *fence)
@@ -150,7 +152,7 @@ static void sde_fence_release(struct fence *fence)
 	if (fence) {
 		f = to_sde_fence(fence);
 		kref_put(&f->ctx->kref, sde_fence_destroy);
-		kfree(f);
+		kmem_cache_free(sde_fence_cache, f);
 	}
 }
 
@@ -203,7 +205,7 @@ static int _sde_fence_create_fd(void *fence_ctx, uint32_t val)
 		goto exit;
 	}
 
-	sde_fence = kzalloc(sizeof(*sde_fence), GFP_KERNEL);
+	sde_fence = kmem_cache_zalloc(sde_fence_cache, GFP_KERNEL);
 	if (!sde_fence)
 		return -ENOMEM;
 
@@ -249,6 +251,11 @@ exit:
 struct sde_fence_context *sde_fence_init(const char *name, uint32_t drm_id)
 {
 	struct sde_fence_context *ctx;
+
+	sde_fence_cache = kmem_cache_create("sde_cache", sizeof(struct sde_fence),
+					0, SLAB_HWCACHE_ALIGN, NULL);
+	if (!sde_fence_cache)
+		return ERR_PTR(-ENOMEM);
 
 	if (!name) {
 		SDE_ERROR("invalid argument(s)\n");
