@@ -32,6 +32,7 @@
 
 void *module_alloc(unsigned long size)
 {
+	u64 module_alloc_end = module_alloc_base + MODULES_VSIZE;
 	gfp_t gfp_mask = GFP_KERNEL;
 	void *p;
 	u64 module_alloc_end = module_alloc_base + MODULES_VSIZE;
@@ -43,6 +44,10 @@ void *module_alloc(unsigned long size)
 	/* Silence the initial allocation */
 	if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
 		gfp_mask |= __GFP_NOWARN;
+
+	if (IS_ENABLED(CONFIG_KASAN))
+		/* don't exceed the static module region - see below */
+		module_alloc_end = MODULES_END;
 
 	p = __vmalloc_node_range(size, MODULE_ALIGN, module_alloc_base,
 				module_alloc_end, gfp_mask, PAGE_KERNEL_EXEC, 0,
