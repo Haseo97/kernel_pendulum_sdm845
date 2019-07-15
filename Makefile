@@ -371,13 +371,13 @@ LDFLAGS_vmlinux =
 
 ifeq ($(cc-name),clang)
 POLLY_FLAGS	:= -O3 -mllvm -polly \
-		   -mllvm -polly-parallel -lgomp \
 		   -mllvm -polly-run-dce \
 		   -mllvm -polly-run-inliner \
 		   -mllvm -polly-opt-fusion=max \
 		   -mllvm -polly-ast-use-context \
 		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-vectorizer=stripmine
+		   -mllvm -polly-vectorizer=stripmine \
+		   -mllvm -polly-invariant-load-hoisting
 else
 POLLY_FLAGS	:=
 endif
@@ -519,8 +519,7 @@ ifneq ($(filter install,$(MAKECMDGOALS)),)
         endif
 endif
 
-OPT_FLAGS	:=  -march=armv8.2a+crypto+crc -mcpu=cortex-a55+simd+crypto+crc \
-		    -funsafe-math-optimizations -ffast-math -fopenmp
+OPT_FLAGS	:=  -fopenmp
 
 ifeq ($(cc-name),clang)
 ifneq ($(CROSS_COMPILE),)
