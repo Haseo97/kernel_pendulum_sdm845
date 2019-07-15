@@ -720,9 +720,6 @@ endif
 
 ifeq ($(cc-name),gcc)
 KBUILD_CFLAGS	+= -Wno-psabi
-KBUILD_CFLAGS	+= -O2
-else
-KBUILD_CFLAGS	+= -O3
 endif
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
