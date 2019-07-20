@@ -632,7 +632,7 @@ static struct notifier_block msm_perf_nb = {
 	.notifier_call = msm_perf_core_ctl_notify
 };
 
-static bool core_ctl_register = true;
+static bool core_ctl_register;
 static int set_core_ctl_register(const char *buf, const struct kernel_param *kp)
 {
 	int ret;
