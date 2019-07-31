@@ -1171,7 +1171,8 @@ bool icnss_is_fw_down(void)
 		return false;
 
 	return test_bit(ICNSS_FW_DOWN, &penv->state) ||
-		test_bit(ICNSS_PD_RESTART, &penv->state);
+		test_bit(ICNSS_PD_RESTART, &penv->state) ||
+		test_bit(ICNSS_REJUVENATE, &penv->state);
 }
 EXPORT_SYMBOL(icnss_is_fw_down);
 
@@ -3670,7 +3671,6 @@ int icnss_trigger_recovery(struct device *dev)
 	if (test_bit(ICNSS_PD_RESTART, &priv->state)) {
 		icnss_pr_err("PD recovery already in progress: state: 0x%lx\n",
 			     priv->state);
-		ret = -EPERM;
 		goto out;
 	}
 

@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +17,7 @@
 #include <linux/rtmutex.h>
 #include <linux/clk.h>
 #include <linux/msm-bus.h>
+#include <dt-bindings/msm/msm-bus-ids.h>
 #include "msm_bus_core.h"
 #include "msm_bus_rpmh.h"
 
