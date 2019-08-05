@@ -771,6 +771,8 @@ endif
 
 ifeq ($(cc-name),clang)
 KBUILD_CFLAGS	+= -O3
+HOSTCFLAGS   	+= -O3
+HOSTCXXFLAGS 	+= -O3
 KBUILD_CFLAGS	+= -mcpu=cortex-a55 -mtune=cortex-a55
 endif
 
