@@ -406,7 +406,7 @@ static inline void msm_wait_for_xmitr(struct uart_port *port)
 		 * TX ready, have a 500ms timeout to avoid stuck here
 		 * and only miss some log to uart.
 		 */
-		if (count-- == 0) {
+		if (!timeout--) {
 			msm_write(port, UART_CR_CMD_RESET_TX, UART_CR);
 			printk_deferred("uart may lost data, resetting TX!\n");
 			break;

@@ -35,11 +35,6 @@ void *module_alloc(unsigned long size)
 	u64 module_alloc_end = module_alloc_base + MODULES_VSIZE;
 	gfp_t gfp_mask = GFP_KERNEL;
 	void *p;
-	u64 module_alloc_end = module_alloc_base + MODULES_VSIZE;
-
-	if (IS_ENABLED(CONFIG_KASAN))
-		/* don't exceed the static module region - see below */
-		module_alloc_end = MODULES_END;
 
 	/* Silence the initial allocation */
 	if (IS_ENABLED(CONFIG_ARM64_MODULE_PLTS))
