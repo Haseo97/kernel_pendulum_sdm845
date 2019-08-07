@@ -433,7 +433,8 @@ acpi_status acpi_add_pm_notifier(struct acpi_device *adev, struct device *dev,
 	if (adev->wakeup.flags.notifier_present)
 		goto out;
 
-	adev->wakeup.ws = wakeup_source_register(dev_name(&adev->dev));
+	adev->wakeup.ws = wakeup_source_register(&adev->dev,
+						dev_name(&adev->dev));
 	adev->wakeup.context.dev = dev;
 	if (work_func)
 		INIT_WORK(&adev->wakeup.context.work, work_func);
