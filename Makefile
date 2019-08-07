@@ -662,8 +662,7 @@ ifdef CONFIG_LD_GOLD
 LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 LDFLAGS		+= -O3
-LDFLAGS		+= --lto-new-pass-manager,)
-
+#LDFLAGS		+= --lto-new-pass-manager,)
 endif
 ifdef CONFIG_LD_LLD
 LD		:= $(LDLLD)
@@ -786,7 +785,7 @@ ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS	+= -Werror
 endif
 
-# Add EXP New Pass Manager fir clang
+# Add EXP New Pass Manager for clang
 KBUILD_CFLAGS	+= $(call cc-option,-fexperimental-new-pass-manager)
 
 # Tell gcc to never replace conditional load with a non-conditional one
