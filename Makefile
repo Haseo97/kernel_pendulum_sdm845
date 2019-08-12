@@ -644,8 +644,6 @@ ifdef CONFIG_LD_GOLD
 LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 LDFLAGS		+= -O3
-LDFLAGS		+= --lto-new-pass-manager,)
-
 endif
 ifdef CONFIG_LD_LLD
 LD		:= $(LDLLD)
@@ -655,9 +653,11 @@ ifdef CONFIG_LTO_CLANG
 # use GNU gold and LD for vmlinux_link, or LLD for LTO linking
 ifeq ($(ld-name),gold)
 LDFLAGS		+= -plugin LLVMgold.so
+LDFLAGS		+= --plugin-opt=O3
 endif
 LDFLAGS		+= -plugin-opt=-function-sections
 LDFLAGS		+= -plugin-opt=-data-sections
+LDFLAGS		+= -plugin-opt=new-pass-manager
 # use llvm-ar for building symbol tables from IR files, and llvm-dis instead
 # of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
@@ -692,7 +692,7 @@ KBUILD_LDFLAGS += --thinlto-cache-dir=.thinlto-cache
 else
 lto-clang-flags	:= -flto
 endif
-lto-clang-flags += -fvisibility=hidden
+lto-clang-flags += -fvisibility=hidden -O3
 
 # allow disabling only clang LTO where needed
 DISABLE_LTO_CLANG := -fno-lto -fvisibility=default
@@ -750,6 +750,10 @@ KBUILD_CFLAGS	+= -O2 $(call cc-disable-warning,maybe-uninitialized,)
 else
 KBUILD_CFLAGS   += -O2
 endif
+endif
+
+ifeq ($(cc-name),clang)
+KBUILD_CFLAGS	+= -O3
 endif
 
 ifdef CONFIG_SHADOW_CALL_STACK
