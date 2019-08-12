@@ -661,7 +661,6 @@ ifdef CONFIG_LD_GOLD
 LDFINAL_vmlinux := $(LD)
 LD		:= $(LDGOLD)
 LDFLAGS		+= -O3
-#LDFLAGS		+= --lto-new-pass-manager,)
 endif
 ifdef CONFIG_LD_LLD
 LD		:= $(LDLLD)
@@ -671,9 +670,11 @@ ifdef CONFIG_LTO_CLANG
 # use GNU gold and LD for vmlinux_link, or LLD for LTO linking
 ifeq ($(ld-name),gold)
 LDFLAGS		+= -plugin LLVMgold.so
+LDFLAGS		+= --plugin-opt=O3
 endif
 LDFLAGS		+= -plugin-opt=-function-sections
 LDFLAGS		+= -plugin-opt=-data-sections
+LDFLAGS		+= -plugin-opt=new-pass-manager
 # use llvm-ar for building symbol tables from IR files, and llvm-dis instead
 # of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
@@ -703,7 +704,7 @@ endif
 
 ifdef CONFIG_LTO_CLANG
 ifdef CONFIG_THINLTO
-lto-clang-flags := -flto=thin -fsplit-lto-unit
+lto-clang-flags := -flto=thin -fsplit-lto-unit -O3
 KBUILD_LDFLAGS += --thinlto-cache-dir=.thinlto-cache
 else
 lto-clang-flags	:= -flto
