@@ -78,7 +78,7 @@
 \f:
 	.endm
 
-def_fn memchr
+ENTRY(memchr)
 	/* Do not dereference srcin if no bytes to compare.  */
 	cbz	cntin, .Lzero_length
 	/*

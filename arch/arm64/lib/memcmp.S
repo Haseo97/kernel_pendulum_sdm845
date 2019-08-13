@@ -88,7 +88,7 @@
 \f:
         .endm
 
-def_fn memcmp p2align=6
+ENTRY(memcmp)
 	subs	limit, limit, 8
 	b.lo	L(less8)
 
@@ -103,6 +103,7 @@ def_fn memcmp p2align=6
 	ldr	data1, [src1, limit]
 	ldr	data2, [src2, limit]
 	b	L(return)
+.p2align 6
 
 L(more16):
 	ldr	data1, [src1], 8
