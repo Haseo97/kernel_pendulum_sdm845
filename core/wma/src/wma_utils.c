@@ -3270,20 +3270,6 @@ int wma_stats_event_handler(void *handle, uint8_t *cmd_param_info,
 	event = param_buf->fixed_param;
 	temp = (uint8_t *) param_buf->data;
 
-	buf_len = event->num_pdev_stats * sizeof(wmi_pdev_stats) +
-		event->num_vdev_stats * sizeof(wmi_vdev_stats) +
-		event->num_peer_stats * sizeof(wmi_peer_stats) +
-		event->num_bcnflt_stats * sizeof(wmi_bcnfilter_stats_t) +
-		event->num_chan_stats * sizeof(wmi_chan_stats) +
-		event->num_mib_stats * sizeof(wmi_mib_stats) +
-		event->num_bcn_stats * sizeof(wmi_bcn_stats) +
-		event->num_peer_extd_stats * sizeof(wmi_peer_extd_stats);
-
-	if (buf_len != param_buf->num_data) {
-		WMA_LOGE("Invalid Buffer len %d received, Expected %d",
-			 buf_len, param_buf->num_data);
-		return -EINVAL;
-	}
 
 	do {
 		if (event->num_pdev_stats > ((WMI_SVC_MSG_MAX_SIZE -
@@ -3665,8 +3651,7 @@ QDF_STATUS wma_send_link_speed(uint32_t link_speed)
 {
 	QDF_STATUS qdf_status = QDF_STATUS_SUCCESS;
 	tpAniSirGlobal mac_ctx;
-	tSirLinkSpeedInfo *ls_ind =
-		(tSirLinkSpeedInfo *) qdf_mem_malloc(sizeof(tSirLinkSpeedInfo));
+	tSirLinkSpeedInfo *ls_ind;
 
 	mac_ctx = cds_get_context(QDF_MODULE_ID_PE);
 	if (!mac_ctx) {
@@ -3674,18 +3659,20 @@ QDF_STATUS wma_send_link_speed(uint32_t link_speed)
 		return QDF_STATUS_E_INVAL;
 	}
 
+	ls_ind = (tSirLinkSpeedInfo *)qdf_mem_malloc(sizeof(tSirLinkSpeedInfo));
 	if (!ls_ind) {
 		WMA_LOGE("%s: Memory allocation failed.", __func__);
-		qdf_status = QDF_STATUS_E_NOMEM;
-	} else {
-		ls_ind->estLinkSpeed = link_speed;
-		if (mac_ctx->sme.pLinkSpeedIndCb)
-			mac_ctx->sme.pLinkSpeedIndCb(ls_ind,
-					mac_ctx->sme.pLinkSpeedCbContext);
-		else
-			WMA_LOGD("%s: pLinkSpeedIndCb is null", __func__);
-		qdf_mem_free(ls_ind);
+		return QDF_STATUS_E_NOMEM;
 	}
+
+	ls_ind->estLinkSpeed = link_speed;
+	if (mac_ctx->sme.pLinkSpeedIndCb)
+		mac_ctx->sme.pLinkSpeedIndCb(ls_ind,
+				mac_ctx->sme.pLinkSpeedCbContext);
+	else
+		WMA_LOGD("%s: pLinkSpeedIndCb is null", __func__);
+
+	qdf_mem_free(ls_ind);
 
 	return qdf_status;
 }

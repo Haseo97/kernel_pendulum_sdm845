@@ -2683,19 +2683,19 @@ static void cds_pdev_set_hw_mode_cb(uint32_t status,
 	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
 	if (!cds_ctx) {
 		cds_err("Invalid CDS Context");
-		return;
+		goto set_done_event;
 	}
 
 	cds_set_hw_mode_change_in_progress(CDS_HW_MODE_NOT_IN_PROGRESS);
 
 	if (status != SET_HW_MODE_STATUS_OK) {
 		cds_err("Set HW mode failed with status %d", status);
-		return;
+		goto set_done_event;
 	}
 
 	if (!vdev_mac_map) {
 		cds_err("vdev_mac_map is NULL");
-		return;
+		goto set_done_event;
 	}
 
 	cds_debug("cfgd_hw_mode_index=%d", cfgd_hw_mode_index);
@@ -2708,7 +2708,7 @@ static void cds_pdev_set_hw_mode_cb(uint32_t status,
 	ret = wma_get_hw_mode_from_idx(cfgd_hw_mode_index, &hw_mode);
 	if (ret != QDF_STATUS_SUCCESS) {
 		cds_err("Get HW mode failed: %d", ret);
-		return;
+		goto set_done_event;
 	}
 
 	cds_debug("MAC0: TxSS:%d, RxSS:%d, Bw:%d",
@@ -2736,7 +2736,10 @@ static void cds_pdev_set_hw_mode_cb(uint32_t status,
 	if (cds_ctx->mode_change_cb)
 		cds_ctx->mode_change_cb();
 
-	return;
+set_done_event:
+	ret = cds_set_opportunistic_update();
+	if (!QDF_IS_STATUS_SUCCESS(ret))
+		cds_err("ERROR: set opportunistic_update event failed");
 }
 
 /**
@@ -4403,6 +4406,14 @@ QDF_STATUS cds_deinit_policy_mgr(void)
 		return QDF_STATUS_E_FAILURE;
 	}
 
+	/* Destroy opportunistic_update_done_evt */
+	status = qdf_event_destroy(&cds_ctx->opportunistic_update_done_evt);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("Failed to destroy opportunistic_update_done_evt");
+		status = QDF_STATUS_E_FAILURE;
+		QDF_ASSERT(0);
+	}
+
 	if (!QDF_IS_STATUS_SUCCESS(qdf_event_destroy
 				  (&cds_ctx->connection_update_done_evt))) {
 		cds_err("Failed to destroy connection_update_done_evt");
@@ -4505,6 +4516,12 @@ QDF_STATUS cds_init_policy_mgr(struct cds_sme_cbacks *sme_cbacks)
 	if (!QDF_IS_STATUS_SUCCESS(status)) {
 		cds_err("channel switch complete init event failed");
 		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_event_create(&cds_ctx->opportunistic_update_done_evt);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("opportunistic_update_done_evt init failed");
+		return status;
 	}
 
 	return QDF_STATUS_SUCCESS;
@@ -11096,6 +11113,67 @@ void cds_checkn_update_hw_mode_single_mac_mode(uint8_t channel)
 	cds_dbs_opportunistic_timer_handler((void *)cds_ctx);
 }
 
+QDF_STATUS cds_set_opportunistic_update(void)
+{
+	QDF_STATUS status;
+	cds_context_type *cds_ctx;
+
+	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!cds_ctx) {
+		cds_err("Invalid CDS Context");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	status = qdf_event_set(&cds_ctx->opportunistic_update_done_evt);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("set event failed");
+		return QDF_STATUS_E_FAILURE;
+	}
+
+	return QDF_STATUS_SUCCESS;
+}
+
+void cds_check_and_stop_opportunistic_timer(void)
+{
+	cds_context_type *cds_ctx;
+	enum cds_conc_next_action action = CDS_NOP;
+	QDF_STATUS status = QDF_STATUS_E_FAILURE;
+
+	cds_ctx = cds_get_context(QDF_MODULE_ID_QDF);
+	if (!cds_ctx) {
+		cds_err("Invalid CDS Context");
+		return;
+	}
+
+	if (cds_ctx->dbs_opportunistic_timer.state != QDF_TIMER_STATE_RUNNING)
+		return;
+
+	qdf_mc_timer_stop(&cds_ctx->dbs_opportunistic_timer);
+
+	action = cds_need_opportunistic_upgrade();
+	if (!action)
+		return;
+
+	qdf_event_reset(&cds_ctx->opportunistic_update_done_evt);
+
+	/*
+	 * lets call for action, session id is being used only
+	 * in hidden ssid case for now. So, session id 0 is ok here.
+	 */
+	status = cds_next_actions(0, action, SIR_UPDATE_REASON_OPPORTUNISTIC);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("Failed in cds_next_actions");
+		return;
+	}
+
+	status = qdf_wait_single_event(&cds_ctx->opportunistic_update_done_evt,
+				       CONNECTION_UPDATE_TIMEOUT);
+	if (!QDF_IS_STATUS_SUCCESS(status)) {
+		cds_err("wait on opportunistic_update_done_evt is failed");
+		return;
+	}
+}
+
 /**
  * cds_set_do_hw_mode_change_flag() - Set flag to indicate hw mode change
  * @flag: Indicate if hw mode change is required or not
@@ -11294,7 +11372,6 @@ bool cds_is_valid_channel_for_channel_switch(uint8_t channel)
 	uint32_t sap_count;
 	enum channel_state state;
 	hdd_context_t *hdd_ctx;
-	bool is_safe;
 
 	hdd_ctx = cds_get_context(QDF_MODULE_ID_HDD);
 
@@ -11306,14 +11383,12 @@ bool cds_is_valid_channel_for_channel_switch(uint8_t channel)
 	sta_sap_scc_on_dfs_chan = cds_is_sta_sap_scc_allowed_on_dfs_channel();
 	sap_count = cds_mode_specific_connection_count(CDS_SAP_MODE, NULL);
 	state = cds_get_channel_state(channel);
-	is_safe = cds_is_safe_channel(channel);
 
-	cds_debug("is_safe %u, sta_sap_scc_on_dfs_chan %u, sap_count %u, channel %u, state %u",
-			is_safe, sta_sap_scc_on_dfs_chan, sap_count, channel,
-			state);
+	cds_debug("sta_sap_scc_on_dfs_chan %u, sap_count %u, channel %u, state %u",
+		  sta_sap_scc_on_dfs_chan, sap_count, channel, state);
 
-	if (is_safe && ((state == CHANNEL_STATE_ENABLE) || (sap_count == 0) ||
-		((state == CHANNEL_STATE_DFS) && sta_sap_scc_on_dfs_chan))) {
+	if ((state == CHANNEL_STATE_ENABLE) || (sap_count == 0) ||
+		((state == CHANNEL_STATE_DFS) && sta_sap_scc_on_dfs_chan)) {
 		cds_debug("Valid channel for channel switch");
 		return true;
 	}
