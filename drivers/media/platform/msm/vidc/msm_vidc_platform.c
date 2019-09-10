@@ -183,7 +183,7 @@ static struct msm_vidc_common_data sdm670_common_data_v0[] = {
 	},
 	{
 		.key = "qcom,max-hw-load",
-		.value = 2241480,
+		.value = 2219400,
 	},
 	{
 		.key = "qcom,max-hq-mbs-per-frame",

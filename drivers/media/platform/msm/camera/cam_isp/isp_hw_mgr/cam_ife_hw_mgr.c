@@ -1941,11 +1941,6 @@ static int cam_ife_mgr_pause_hw(struct cam_ife_hw_mgr_ctx *ctx)
 	return cam_ife_mgr_bw_control(ctx, CAM_VFE_BW_CONTROL_EXCLUDE);
 }
 
-static int cam_ife_mgr_resume_hw(struct cam_ife_hw_mgr_ctx *ctx)
-{
-	return cam_ife_mgr_bw_control(ctx, CAM_VFE_BW_CONTROL_INCLUDE);
-}
-
 /* entry function: stop_hw */
 static int cam_ife_mgr_stop_hw(void *hw_mgr_priv, void *stop_hw_args)
 {
@@ -2358,42 +2353,6 @@ static int cam_ife_mgr_write(void *hw_mgr_priv, void *write_args)
 	return -EPERM;
 }
 
-static int cam_ife_mgr_reset(void *hw_mgr_priv, void *hw_reset_args)
-{
-	struct cam_ife_hw_mgr            *hw_mgr       = hw_mgr_priv;
-	struct cam_hw_reset_args         *reset_args = hw_reset_args;
-	struct cam_ife_hw_mgr_ctx        *ctx;
-	struct cam_ife_hw_mgr_res        *hw_mgr_res;
-	uint32_t                          i;
-	int                               rc = 0;
-
-	if (!hw_mgr_priv || !hw_reset_args) {
-		CAM_ERR(CAM_ISP, "Invalid arguments");
-		return -EINVAL;
-	}
-
-	ctx = (struct cam_ife_hw_mgr_ctx *)reset_args->ctxt_to_hw_map;
-	if (!ctx || !ctx->ctx_in_use) {
-		CAM_ERR(CAM_ISP, "Invalid context is used");
-		return -EPERM;
-	}
-	CAM_DBG(CAM_ISP, "reset csid and vfe hw");
-	list_for_each_entry(hw_mgr_res, &ctx->res_list_ife_csid,
-		list) {
-		rc = cam_ife_hw_mgr_reset_csid_res(hw_mgr_res);
-		if (rc) {
-			CAM_ERR(CAM_ISP, "Failed RESET (%d) rc:%d",
-				hw_mgr_res->res_id, rc);
-			goto end;
-			}
-		}
-
-	for (i = 0; i < ctx->num_base; i++)
-		rc = cam_ife_mgr_reset_vfe_hw(hw_mgr, ctx->base[i].idx);
-end:
-	return rc;
-}
-
 static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 					void *release_hw_args)
 {
@@ -2428,7 +2387,6 @@ static int cam_ife_mgr_release_hw(void *hw_mgr_priv,
 	memset(ctx->base, 0, sizeof(ctx->base));
 
 	/* release cdm handle */
-	ctx->dual_ife_irq_mismatch_cnt = 0;
 	cam_cdm_release(ctx->cdm_handle);
 
 	/* clean context */
@@ -2905,6 +2863,11 @@ end:
 	return rc;
 }
 
+static int cam_ife_mgr_resume_hw(struct cam_ife_hw_mgr_ctx *ctx)
+{
+	return cam_ife_mgr_bw_control(ctx, CAM_VFE_BW_CONTROL_INCLUDE);
+}
+
 static int cam_ife_mgr_sof_irq_debug(
 	struct cam_ife_hw_mgr_ctx *ctx,
 	uint32_t sof_irq_enable)
@@ -2955,7 +2918,7 @@ static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
 	int32_t iommu_hdl, int32_t sec_mmu_hdl, uint32_t pf_buf_info,
 	bool *mem_found)
 {
-	dma_addr_t iova_addr;
+	uint64_t   iova_addr;
 	size_t     src_buf_size;
 	int        i;
 	int        j;
@@ -3001,6 +2964,11 @@ static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
 				CAM_ERR(CAM_ISP, "get src buf address fail");
 				continue;
 			}
+			if (iova_addr >> 32) {
+				CAM_ERR(CAM_ISP, "Invalid mapped address");
+				rc = -EINVAL;
+				continue;
+			}
 
 			CAM_INFO(CAM_ISP,
 				"pln %d w %d h %d size %d addr 0x%x offset 0x%x memh %x",
@@ -3010,36 +2978,6 @@ static void cam_ife_mgr_print_io_bufs(struct cam_packet *packet,
 				(unsigned int)iova_addr,
 				io_cfg[i].offsets[j],
 				io_cfg[i].mem_handle[j]);
-		}
-	}
-}
-
-static void cam_ife_mgr_ctx_irq_dump(struct cam_ife_hw_mgr_ctx *ctx)
-{
-	struct cam_ife_hw_mgr_res        *hw_mgr_res;
-	struct cam_hw_intf               *hw_intf;
-	struct cam_isp_hw_get_cmd_update  cmd_update;
-	int i = 0;
-
-	list_for_each_entry(hw_mgr_res, &ctx->res_list_ife_src, list) {
-		if (hw_mgr_res->res_type == CAM_IFE_HW_MGR_RES_UNINIT)
-			continue;
-		for (i = 0; i < CAM_ISP_HW_SPLIT_MAX; i++) {
-			if (!hw_mgr_res->hw_res[i])
-				continue;
-			switch (hw_mgr_res->hw_res[i]->res_id) {
-			case CAM_ISP_HW_VFE_IN_CAMIF:
-				hw_intf = hw_mgr_res->hw_res[i]->hw_intf;
-				cmd_update.res = hw_mgr_res->hw_res[i];
-				cmd_update.cmd_type =
-					CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP;
-				hw_intf->hw_ops.process_cmd(hw_intf->hw_priv,
-					CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP,
-					&cmd_update, sizeof(cmd_update));
-				break;
-			default:
-				break;
-			}
 		}
 	}
 }
@@ -3696,26 +3634,11 @@ static int cam_ife_hw_mgr_check_irq_for_dual_vfe(
 		(event_cnt[core_idx1] &&
 		(event_cnt[core_idx1] - event_cnt[core_idx0] > 1))) {
 
-		if (ife_hw_mgr_ctx->dual_ife_irq_mismatch_cnt > 10) {
-			rc = -1;
-			return rc;
-		}
-
 		CAM_ERR_RATE_LIMIT(CAM_ISP,
-			"One of the VFE could not generate hw event %d",
+			"One of the VFE cound not generate hw event %d",
 			hw_event_type);
-		if (event_cnt[core_idx0] >= 2) {
-			event_cnt[core_idx0]--;
-			ife_hw_mgr_ctx->dual_ife_irq_mismatch_cnt++;
-		}
-		if (event_cnt[core_idx1] >= 2) {
-			event_cnt[core_idx1]--;
-			ife_hw_mgr_ctx->dual_ife_irq_mismatch_cnt++;
-		}
-
-		if (ife_hw_mgr_ctx->dual_ife_irq_mismatch_cnt == 1)
-			cam_ife_mgr_ctx_irq_dump(ife_hw_mgr_ctx);
-		rc = 0;
+		rc = -1;
+		return rc;
 	}
 
 	CAM_DBG(CAM_ISP, "Only one core_index has given hw event %d",
@@ -4342,9 +4265,6 @@ int cam_ife_mgr_do_tasklet(void *handler_priv, void *evt_payload_priv)
 		return rc;
 
 	evt_payload = evt_payload_priv;
-	if (!handler_priv)
-		return rc;
-
 	ife_hwr_mgr_ctx = (struct cam_ife_hw_mgr_ctx *)handler_priv;
 
 	CAM_DBG(CAM_ISP, "addr of evt_payload = %pK core_index:%d",
@@ -4686,7 +4606,6 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 	hw_mgr_intf->hw_prepare_update = cam_ife_mgr_prepare_hw_update;
 	hw_mgr_intf->hw_config = cam_ife_mgr_config_hw;
 	hw_mgr_intf->hw_cmd = cam_ife_mgr_cmd;
-	hw_mgr_intf->hw_reset = cam_ife_mgr_reset;
 
 	if (iommu_hdl)
 		*iommu_hdl = g_ife_hw_mgr.mgr_common.img_iommu_hdl;

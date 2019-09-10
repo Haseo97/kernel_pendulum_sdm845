@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -734,11 +734,6 @@ int cam_lrme_hw_process_irq(void *priv, void *data)
 
 	mutex_lock(&lrme_hw->hw_mutex);
 
-	if (lrme_hw->hw_state == CAM_HW_STATE_POWER_DOWN) {
-		CAM_DBG(CAM_LRME, "LRME HW is in off state");
-		goto end;
-	}
-
 	if (top_irq_status & (1 << 3)) {
 		CAM_DBG(CAM_LRME, "Error");
 		rc = cam_lrme_hw_util_process_err(lrme_hw);
@@ -899,7 +894,7 @@ int cam_lrme_hw_stop(void *hw_priv, void *hw_stop_args, uint32_t arg_size)
 		lrme_core->state = CAM_LRME_CORE_STATE_INIT;
 	} else {
 		CAM_ERR(CAM_LRME, "HW in wrong state %d", lrme_core->state);
-		rc = -EINVAL;
+		return -EINVAL;
 	}
 
 unlock:
@@ -951,8 +946,7 @@ int cam_lrme_hw_submit_req(void *hw_priv, void *hw_submit_args,
 
 	if (lrme_core->req_submit != NULL) {
 		CAM_ERR(CAM_LRME, "req_submit is not NULL");
-		rc = -EBUSY;
-		goto error;
+		return -EBUSY;
 	}
 
 	rc = cam_lrme_hw_util_submit_req(lrme_core, frame_req);

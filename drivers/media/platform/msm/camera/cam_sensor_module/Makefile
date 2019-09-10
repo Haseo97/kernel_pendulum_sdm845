@@ -1,4 +1,4 @@
-/obj-$(CONFIG_SPECTRA_CAMERA) += cam_res_mgr/
+obj-$(CONFIG_SPECTRA_CAMERA) += cam_res_mgr/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_sensor_utils/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_cci/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_sensor_io/
@@ -8,5 +8,4 @@ obj-$(CONFIG_SPECTRA_CAMERA) += cam_sensor/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_flash/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_eeprom/
 obj-$(CONFIG_SPECTRA_CAMERA) += cam_ois/
-obj-$(CONFIG_SPECTRA_CAMERA) += cam_ir_led/
 obj-$(CONFIG_SPECTRA_CAMERA) += 3dsl_eeprom/
