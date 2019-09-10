@@ -654,10 +654,10 @@ ifdef CONFIG_LTO_CLANG
 ifeq ($(ld-name),gold)
 LDFLAGS		+= -plugin LLVMgold.so
 LDFLAGS		+= --plugin-opt=O3
-endif
 LDFLAGS		+= -plugin-opt=-function-sections
 LDFLAGS		+= -plugin-opt=-data-sections
 LDFLAGS		+= -plugin-opt=new-pass-manager
+endif
 # use llvm-ar for building symbol tables from IR files, and llvm-dis instead
 # of objdump for processing symbol versions and exports
 LLVM_AR		:= llvm-ar
@@ -687,12 +687,13 @@ endif
 
 ifdef CONFIG_LTO_CLANG
 ifdef CONFIG_THINLTO
-lto-clang-flags := -flto=thin -fsplit-lto-unit
-KBUILD_LDFLAGS += --thinlto-cache-dir=.thinlto-cache
+lto-clang-flags	:= -flto=thin -fsplit-lto-unit
+KBUILD_LDFLAGS	+= --thinlto-cache-dir=.thinlto-cache
 else
 lto-clang-flags	:= -flto
 endif
-lto-clang-flags += -fvisibility=hidden -O3
+lto-clang-flags	+= -fvisibility=hidden
+lto-clang-flags	+= -O3
 
 # allow disabling only clang LTO where needed
 DISABLE_LTO_CLANG := -fno-lto -fvisibility=default
@@ -770,7 +771,7 @@ ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS	+= -Werror
 endif
 
-# Add EXP New Pass Manager fir clang
+# Add EXP New Pass Manager for clang
 KBUILD_CFLAGS	+= $(call cc-option,-fexperimental-new-pass-manager)
 
 # Tell gcc to never replace conditional load with a non-conditional one
