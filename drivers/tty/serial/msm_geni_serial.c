@@ -310,8 +310,6 @@ static int vote_clock_on(struct uart_port *uport)
 		return ret;
 	}
 	port->ioctl_count++;
-	usage_count = atomic_read(&uport->dev->power.usage_count);
-		usage_count, port->edge_count);
 
 #ifdef DEBUG_PM
 	dev_info(uport->dev,
@@ -410,9 +408,6 @@ static unsigned int msm_geni_serial_get_mctrl(struct uart_port *uport)
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
 	if (!uart_console(uport) && device_pending_suspend(uport)) {
-		IPC_LOG_MSG(port->ipc_log_misc,
-				"%s.Device is suspended, %s\n",
-				__func__, current->comm);
 		return TIOCM_DSR | TIOCM_CAR | TIOCM_CTS;
 	}
 
@@ -888,7 +883,6 @@ static void msm_geni_serial_start_tx(struct uart_port *uport)
 	}
 	return;
 check_flow_ctrl:
-	geni_ios = geni_read_reg_nolog(uport->membase, SE_GENI_IOS);
 	if (++ios_log_limit % 5 == 0) {
 		ios_log_limit = 0;
 	}
@@ -1019,7 +1013,6 @@ static void start_rx_sequencer(struct uart_port *uport)
 	 * go through.
 	 */
 	mb();
-exit_start_rx_sequencer:
 	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
 		geni_status, geni_read_reg(uport->membase, SE_DMA_DEBUG_REG0);
 }
@@ -1106,7 +1099,6 @@ exit_rx_seq:
 		port->rx_dma = (dma_addr_t)NULL;
 	}
 	geni_status = geni_read_reg_nolog(uport->membase, SE_GENI_STATUS);
-	IPC_LOG_MSG(port->ipc_log_misc, "%s: 0x%x\n", __func__, geni_status);
 }
 
 static void msm_geni_serial_stop_rx(struct uart_port *uport)
@@ -2197,9 +2189,7 @@ static int msm_geni_serial_get_ver_info(struct uart_port *uport)
 		goto exit_ver_info;
 	}
 
-	IPC_LOG_MSG(msm_port->ipc_log_misc, "%s: FW Ver:0x%x%x\n",
-		__func__,
-		msm_port->ver_info.m_fw_ver, msm_port->ver_info.s_fw_ver);
+		msm_port->ver_info.m_fw_ver, msm_port->ver_info.s_fw_ver;
 
 	hw_ver = geni_se_qupv3_hw_version(msm_port->wrapper_dev,
 		&msm_port->ver_info.hw_major_ver,
@@ -2209,10 +2199,8 @@ static int msm_geni_serial_get_ver_info(struct uart_port *uport)
 		dev_err(uport->dev, "%s:Err getting HW version %d\n",
 						__func__, hw_ver);
 	else
-		IPC_LOG_MSG(msm_port->ipc_log_misc, "%s: HW Ver:%x.%x.%x\n",
-			__func__, msm_port->ver_info.hw_major_ver,
 			msm_port->ver_info.hw_minor_ver,
-			msm_port->ver_info.hw_step_ver);
+			msm_port->ver_info.hw_step_ver;
 exit_ver_info:
 	se_geni_clks_off(&msm_port->serial_rsc);
 	return ret;
