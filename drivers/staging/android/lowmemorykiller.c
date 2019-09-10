@@ -140,6 +140,17 @@ void handle_lmk_event(struct task_struct *selected, int selected_tasksize,
 
 	taskname[res] = '\0';
 
+	res = get_cmdline(selected, taskname, MAX_TASKNAME - 1);
+
+	/* No valid process name means this is definitely not associated with a
+	 * userspace activity.
+	 */
+
+	if (res <= 0 || res >= MAX_TASKNAME)
+		return;
+
+	taskname[res] = '\0';
+
 	spin_lock(&lmk_event_lock);
 
 	head = event_buffer.head;
