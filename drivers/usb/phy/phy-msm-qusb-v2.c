@@ -1450,8 +1450,8 @@ static int qusb_phy_probe(struct platform_device *pdev)
 		}
 	}
 
-	if (qphy->pinctrl && qphy->atest_usb13_suspend) {
-		ret = pinctrl_select_state(qphy->pinctrl, qphy->atest_usb13_suspend);
+	if (qphy->pinctrl && qphy->atest_usb_suspend) {
+		ret = pinctrl_select_state(qphy->pinctrl, qphy->atest_usb_suspend);
 		if (ret < 0)
 			dev_err(qphy->phy.dev, "pinctrl state suspend select failed\n");
 	}

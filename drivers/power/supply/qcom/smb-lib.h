@@ -83,12 +83,9 @@ enum print_reason {
 #define OV_VOTER			"OV_VOTER"
 #define FG_ESR_VOTER			"FG_ESR_VOTER"
 #define FCC_STEPPER_VOTER		"FCC_STEPPER_VOTER"
-<<<<<<< HEAD
 #define PD_NOT_SUPPORTED_VOTER		"PD_NOT_SUPPORTED_VOTER"
-=======
 #define DCIN_USER_VOTER			"DCIN_USER_VOTER"
 #define UNSTANDARD_QC2_VOTER		"UNSTANDARD_QC2_VOTER"
->>>>>>> 19045d875d8a... treewide: Import Xiaomi minimal changes
 
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
@@ -438,14 +435,11 @@ struct smb_charger {
 	int			qc2_max_pulses;
 	bool			non_compliant_chg_detected;
 	bool			fake_usb_insertion;
-<<<<<<< HEAD
 	bool			reddragon_ipc_wa;
-=======
 	bool			ignore_recheck_flag;
 	bool			check_vbus_once;
 	bool			unstandard_hvdcp;
 	bool			use_ext_boost;
->>>>>>> 19045d875d8a... treewide: Import Xiaomi minimal changes
 
 	/* extcon for VBUS / ID notification to USB for uUSB */
 	struct extcon_dev	*extcon;
