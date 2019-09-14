@@ -1697,7 +1697,7 @@ got_it:
 
 		if (!f2fs_is_valid_blkaddr(F2FS_I_SB(inode), block_nr,
 							DATA_GENERIC_ENHANCE_READ)) {
-			ret = -EFAULT;
+			ret = -EFSCORRUPTED;
 			goto out;
 		}
 	} else {
