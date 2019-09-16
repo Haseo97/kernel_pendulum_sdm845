@@ -872,6 +872,9 @@ typedef struct {
  * @isDfsChannel: is DFS channel
  * @vhtCapable: VHT capable
  * @dot11_mode: 802.11 mode
+ * @reduced_beacon_interval: reduced beacon interval value
+ * @ssid_hidden: the sap ssid is hidden
+ * @ssid: sap ssid
  */
 typedef struct {
 	uint8_t channelNumber;
@@ -904,6 +907,8 @@ typedef struct {
 	uint8_t nss;
 	bool rx_ldpc;
 	uint16_t reduced_beacon_interval;
+	uint8_t ssid_hidden;
+	tSirMacSSid ssid;
 } tSwitchChannelParams, *tpSwitchChannelParams;
 
 typedef void (*tpSetLinkStateCallback)(tpAniSirGlobal pMac, void *msgParam,
@@ -1148,6 +1153,7 @@ typedef struct sMaxTxPowerPerBandParams {
  * @tx_aggr_sw_retry_threshold_bk: sw retry threshold for bk
  * @tx_aggr_sw_retry_threshold_vi: sw retry threshold for vi
  * @tx_aggr_sw_retry_threshold_vo: sw retry threshold for vo
+ * @disable_4way_hs_offload: enable/disable 4 way handshake offload to firmware
  */
 struct add_sta_self_params {
 	tSirMacAddr self_mac_addr;
@@ -1172,6 +1178,7 @@ struct add_sta_self_params {
 	uint32_t tx_aggr_sw_retry_threshold_bk;
 	uint32_t tx_aggr_sw_retry_threshold_vi;
 	uint32_t tx_aggr_sw_retry_threshold_vo;
+	bool disable_4way_hs_offload;
 };
 
 /**
