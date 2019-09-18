@@ -41,7 +41,6 @@
 #error EXFAT only supports linux kernel version 3.0 or higher
 #endif
 
-#include "version.h"
 #include "config.h"
 
 #include "exfat.h"
@@ -3436,23 +3435,6 @@ static struct kobj_type exfat_ktype = {
 	.sysfs_ops     = &exfat_attr_ops,
 };
 
-static ssize_t version_show(struct kobject *kobj,
-		struct kobj_attribute *attr, char *buff)
-{
-	return snprintf(buff, PAGE_SIZE, "FS Version %s\n", EXFAT_VERSION);
-}
-
-static struct kobj_attribute version_attr = __ATTR_RO(version);
-
-static struct attribute *attributes[] = {
-	&version_attr.attr,
-	NULL,
-};
-
-static struct attribute_group attr_group = {
-	.attrs = attributes,
-};
-
 enum {
 	Opt_uid,
 	Opt_gid,
@@ -3920,7 +3902,6 @@ static int __init init_exfat_fs(void)
 {
 	int err;
 
-	exfat_log_version();
 	err = exfat_fscore_init();
 	if (err)
 		goto error;
@@ -3929,12 +3910,6 @@ static int __init init_exfat_fs(void)
 	if (!exfat_kset) {
 		pr_err("exFAT: failed to create fs_kobj\n");
 		err = -ENOMEM;
-		goto error;
-	}
-
-	err = sysfs_create_group(&exfat_kset->kobj, &attr_group);
-	if (err) {
-		pr_err("exFAT: failed to create exfat version attributes\n");
 		goto error;
 	}
 
@@ -3959,7 +3934,6 @@ error:
 	exfat_uevent_uninit();
 
 	if (exfat_kset) {
-		sysfs_remove_group(&exfat_kset->kobj, &attr_group);
 		kset_unregister(exfat_kset);
 		exfat_kset = NULL;
 	}
@@ -3976,7 +3950,6 @@ static void __exit exit_exfat_fs(void)
 	exfat_uevent_uninit();
 
 	if (exfat_kset) {
-		sysfs_remove_group(&exfat_kset->kobj, &attr_group);
 		kset_unregister(exfat_kset);
 		exfat_kset = NULL;
 	}
