@@ -15,32 +15,10 @@
 #include <linux/ratelimit.h>
 #include <linux/version.h>
 #include <linux/kobject.h>
+#include <linux/iversion.h>
 #include "api.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 16, 0)
-#include <linux/iversion.h>
-#define INC_IVERSION(x)		(inode_inc_iversion(x))
-#define GET_IVERSION(x)		(inode_peek_iversion_raw(x))
-#define SET_IVERSION(x,y)	(inode_set_iversion(x, y))
-#else
-#define INC_IVERSION(x)		(x->i_version++)
-#define GET_IVERSION(x)		(x->i_version)
-#define SET_IVERSION(x,y)	(x->i_version = y)
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
-#define timespec_compat	timespec64
-#define KTIME_GET_REAL_TS ktime_get_real_ts64
-#else
-#define timespec_compat	timespec
-#define KTIME_GET_REAL_TS ktime_get_real_ts
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-#define EXFAT_IS_SB_RDONLY(sb)	((sb)->s_flags & MS_RDONLY)
-#else
 #define EXFAT_IS_SB_RDONLY(sb)	((sb)->s_flags & SB_RDONLY)
-#endif
 
 /*
  * exfat error flags
@@ -92,13 +70,9 @@
  * exfat mount in-memory data
  */
 struct exfat_mount_options {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
 	kuid_t fs_uid;
 	kgid_t fs_gid;
-#else /* LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0) */
-	uid_t fs_uid;
-	gid_t fs_gid;
-#endif
+
 	unsigned short fs_fmask;
 	unsigned short fs_dmask;
 	unsigned short allow_utime; /* permission for setting the [am]time */
@@ -126,13 +100,12 @@ struct exfat_sb_info {
 	struct mutex s_vlock;   /* volume lock */
 	int use_vmalloc;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 	int s_dirt;
 	struct mutex s_lock;    /* superblock lock */
 	int write_super_queued;			/* Write_super work is pending? */
 	struct delayed_work write_super_work;   /* Work_queue data structrue for write_super() */
 	spinlock_t work_lock;			/* Lock for WQ */
-#endif
+
 	struct super_block *host_sb;		/* sb pointer */
 	struct exfat_mount_options options;
 	struct nls_table *nls_disk; /* Codepage used on disk */
@@ -167,9 +140,7 @@ struct exfat_inode_info {
 	loff_t i_size_aligned;          /* block-aligned i_size (used in cont_write_begin) */
 	loff_t i_pos;               /* on-disk position of directory entry or 0 */
 	struct hlist_node i_hash_fat;    /* hash by i_location */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
 	struct rw_semaphore truncate_lock; /* protect bmap against truncate */
-#endif
 	struct inode vfs_inode;
 };
 
@@ -290,9 +261,9 @@ __exfat_msg(struct super_block *sb, const char *lv, int st, const char *fmt, ...
 	__exfat_msg(sb, lv, 0, fmt, ## args)
 #define exfat_log_msg(sb, lv, fmt, args...)          \
 	__exfat_msg(sb, lv, 1, fmt, ## args)
-extern void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec_compat *ts,
+extern void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec64 *ts,
 				DATE_TIME_T *tp);
-extern void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec_compat *ts,
+extern void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec64 *ts,
 				DATE_TIME_T *tp);
 extern TIMESTAMP_T *exfat_tm_now(struct exfat_sb_info *sbi, TIMESTAMP_T *tm);
 

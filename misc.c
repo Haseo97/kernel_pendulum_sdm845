@@ -88,11 +88,7 @@ void __exfat_fs_error(struct super_block *sb, int report, const char *fmt, ...)
 		panic("exFAT-fs (%s[%d:%d]): fs panic from previous error\n",
 			sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 	} else if (opts->errors == EXFAT_ERRORS_RO && !EXFAT_IS_SB_RDONLY(sb)) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-		sb->s_flags |= MS_RDONLY;
-#else
 		sb->s_flags |= SB_RDONLY;
-#endif
 		pr_err("exFAT-fs (%s[%d:%d]): file-system has been set to "
 			"read-only\n", sb->s_id, MAJOR(bd_dev), MINOR(bd_dev));
 		exfat_uevent_ro_remount(sb);
@@ -156,7 +152,7 @@ static time_t accum_days_in_year[] = {
 };
 
 /* Convert a FAT time/date pair to a UNIX date (seconds since 1 1 70). */
-void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec_compat *ts,
+void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec64 *ts,
 		DATE_TIME_T *tp)
 {
 	time_t year = tp->Year;
@@ -179,7 +175,7 @@ void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec_compat *ts,
 }
 
 /* Convert linear UNIX date to a FAT time/date pair. */
-void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec_compat *ts,
+void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec64 *ts,
 		DATE_TIME_T *tp)
 {
 	time_t second = ts->tv_sec;
@@ -243,10 +239,10 @@ void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec_compat *ts,
 
 TIMESTAMP_T *exfat_tm_now(struct exfat_sb_info *sbi, TIMESTAMP_T *tp)
 {
-	struct timespec_compat ts;
+	struct timespec64 ts;
 	DATE_TIME_T dt;
 
-	KTIME_GET_REAL_TS(&ts);
+	ktime_get_real_ts64(&ts);
 	exfat_time_unix2fat(sbi, &ts, &dt);
 
 	tp->year = dt.Year;
