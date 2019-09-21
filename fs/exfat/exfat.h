@@ -290,6 +290,7 @@ __exfat_msg(struct super_block *sb, const char *lv, int st, const char *fmt, ...
 	__exfat_msg(sb, lv, 0, fmt, ## args)
 #define exfat_log_msg(sb, lv, fmt, args...)          \
 	__exfat_msg(sb, lv, 1, fmt, ## args)
+extern void exfat_log_version(void);
 extern void exfat_time_fat2unix(struct exfat_sb_info *sbi, struct timespec_compat *ts,
 				DATE_TIME_T *tp);
 extern void exfat_time_unix2fat(struct exfat_sb_info *sbi, struct timespec_compat *ts,

@@ -18,6 +18,7 @@
 #include <linux/buffer_head.h>
 #include <linux/time.h>
 #include "exfat.h"
+#include "version.h"
 
 #ifdef CONFIG_EXFAT_UEVENT
 static struct kobject exfat_uevent_kobj;
@@ -120,6 +121,12 @@ void __exfat_msg(struct super_block *sb, const char *level, int st, const char *
 	va_end(args);
 }
 EXPORT_SYMBOL(__exfat_msg);
+
+void exfat_log_version(void)
+{
+	pr_info("exFAT: file-system version %s\n", EXFAT_VERSION);
+}
+EXPORT_SYMBOL(exfat_log_version);
 
 /* <linux/time.h> externs sys_tz
  * extern struct timezone sys_tz;
