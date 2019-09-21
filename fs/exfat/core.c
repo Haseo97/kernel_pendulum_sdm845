@@ -19,6 +19,9 @@
 
 void exfat_set_sb_dirty(struct super_block *sb)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
+	sb->s_dirt = 1;
+#else /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0) */
 	struct exfat_sb_info *sbi = EXFAT_SB(sb);
 
 	sbi->s_dirt = 1;
@@ -32,6 +35,7 @@ void exfat_set_sb_dirty(struct super_block *sb)
 		sbi->write_super_queued = 1;
 	}
 	spin_unlock(&sbi->work_lock);
+#endif
 }
 
 static s32 check_type_size(void)
@@ -1652,10 +1656,10 @@ s32 exfat_fscore_lookup(struct inode *inode, u8 *path, FILE_ID_T *fid)
 		return ret;
 
 	/* check the validation of hint_stat and initialize it if required */
-	if (dir_fid->version != (u32)(inode_peek_iversion_raw(inode) & 0xffffffff)) {
+	if (dir_fid->version != (u32)(GET_IVERSION(inode) & 0xffffffff)) {
 		dir_fid->hint_stat.clu = dir.dir;
 		dir_fid->hint_stat.eidx = 0;
-		dir_fid->version = (u32)(inode_peek_iversion_raw(inode) & 0xffffffff);
+		dir_fid->version = (u32)(GET_IVERSION(inode) & 0xffffffff);
 		dir_fid->hint_femp.eidx = -1;
 	}
 
