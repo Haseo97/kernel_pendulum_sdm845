@@ -472,7 +472,7 @@ static void update_min_rate_limit_ns(struct sugov_policy *sg_policy)
 static ssize_t up_rate_limit_us_show(struct gov_attr_set *attr_set, char *buf)
 {
  	struct sugov_tunables *tunables = to_sugov_tunables(attr_set);
- 
+
 	return sprintf(buf, "%u\n", tunables->up_rate_limit_us);
 }
 

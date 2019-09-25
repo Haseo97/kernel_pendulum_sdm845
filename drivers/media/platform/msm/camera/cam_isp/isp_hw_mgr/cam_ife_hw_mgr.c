@@ -32,6 +32,7 @@
 #include "cam_common_util.h"
 
 #define CAM_IFE_HW_ENTRIES_MAX  20
+#define CAM_IFE_BUF_DONE_DELAY_TH 33000
 
 #define TZ_SVC_SMMU_PROGRAM 0x15
 #define TZ_SAFE_SYSCALL_ID  0x3
@@ -43,7 +44,7 @@
 	(CAM_ISP_PACKET_META_GENERIC_BLOB_COMMON + 1)
 
 #define CAM_ISP_GENERIC_BLOB_TYPE_MAX               \
-	(CAM_ISP_GENERIC_BLOB_TYPE_BW_CONFIG + 1)
+	(CAM_ISP_GENERIC_BLOB_TYPE_FPS_CONFIG + 1)
 
 static uint32_t blob_type_hw_cmd_map[CAM_ISP_GENERIC_BLOB_TYPE_MAX] = {
 	CAM_ISP_HW_CMD_GET_HFR_UPDATE,
@@ -3041,6 +3042,10 @@ static int cam_ife_mgr_cmd(void *hw_mgr_priv, void *cmd_args)
 			hw_cmd_args->u.pf_args.buf_info,
 			hw_cmd_args->u.pf_args.mem_found);
 		break;
+	case CAM_HW_MGR_CMD_GET_TIMESTAMP_TH:
+		hw_cmd_args->u.irq_timestamps_th =
+			g_ife_hw_mgr.debug_cfg.ife_timestamps_th;
+		break;
 	default:
 		CAM_ERR(CAM_ISP, "Invalid cmd");
 	}
@@ -3548,6 +3553,8 @@ static int cam_ife_hw_mgr_handle_reg_update(
 				break;
 
 			if (!rup_status) {
+				rup_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 				ife_hwr_irq_rup_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
 					CAM_ISP_HW_EVENT_REG_UPDATE,
@@ -3576,6 +3583,8 @@ static int cam_ife_hw_mgr_handle_reg_update(
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
 			if (!rup_status) {
+				rup_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 				/* Send the Reg update hw event */
 				ife_hwr_irq_rup_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
@@ -3918,6 +3927,8 @@ static int cam_ife_hw_mgr_handle_sof(
 						ife_hw_mgr_ctx,
 						&sof_done_event_data.timestamp,
 						&sof_done_event_data.boot_time);
+					sof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 
 					ife_hw_irq_sof_cb(
 						ife_hw_mgr_ctx->common.cb_priv,
@@ -3940,6 +3951,8 @@ static int cam_ife_hw_mgr_handle_sof(
 					ife_hw_mgr_ctx,
 					&sof_done_event_data.timestamp,
 					&sof_done_event_data.boot_time);
+				sof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 
 				ife_hw_irq_sof_cb(
 					ife_hw_mgr_ctx->common.cb_priv,
@@ -4023,11 +4036,14 @@ static int cam_ife_hw_mgr_handle_eof_for_camif_hw_res(
 				if (atomic_read(
 					&ife_hwr_mgr_ctx->overflow_pending))
 					break;
-				if (!eof_status)
+				if (!eof_status) {
+					eof_done_event_data.irq_mono_boot_time =
+						evt_payload->ts.time_usecs;
 					ife_hwr_irq_eof_cb(
 						ife_hwr_mgr_ctx->common.cb_priv,
 						CAM_ISP_HW_EVENT_EOF,
 						&eof_done_event_data);
+					}
 			}
 
 			break;
@@ -4070,11 +4086,14 @@ static int cam_ife_hw_mgr_handle_eof_for_camif_hw_res(
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
 
-			if (!rc)
+			if (!rc) {
+				eof_done_event_data.irq_mono_boot_time =
+					evt_payload->ts.time_usecs;
 				ife_hwr_irq_eof_cb(
 					ife_hwr_mgr_ctx->common.cb_priv,
 					CAM_ISP_HW_EVENT_EOF,
 					&eof_done_event_data);
+			}
 
 			break;
 
@@ -4174,6 +4193,8 @@ static int cam_ife_hw_mgr_handle_buf_done_for_hw_res(
 
 			if (atomic_read(&ife_hwr_mgr_ctx->overflow_pending))
 				break;
+			buf_done_event_data.irq_mono_boot_time =
+					evt_payload->ts.time_usecs;
 			/* Report for Successful buf_done event if any */
 			if (buf_done_event_data.num_handles > 0 &&
 				ife_hwr_irq_wm_done_cb) {
@@ -4610,6 +4631,8 @@ int cam_ife_hw_mgr_init(struct cam_hw_mgr_intf *hw_mgr_intf, int *iommu_hdl)
 	if (iommu_hdl)
 		*iommu_hdl = g_ife_hw_mgr.mgr_common.img_iommu_hdl;
 
+	g_ife_hw_mgr.debug_cfg.ife_timestamps_th =
+		CAM_IFE_BUF_DONE_DELAY_TH;
 	cam_ife_hw_mgr_debug_register();
 	CAM_DBG(CAM_ISP, "Exit");
 
