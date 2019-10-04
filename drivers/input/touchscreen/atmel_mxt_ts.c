@@ -2,6 +2,7 @@
  * Atmel maXTouch Touchscreen driver
  *
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
+ * Copyright (C) 2018 XiaoMi, Inc.
  * Copyright (C) 2011 Atmel Corporation
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
  *
@@ -26,6 +27,7 @@
 #include <linux/gpio.h>
 #include <linux/string.h>
 #include <linux/of_gpio.h>
+#include <linux/hwinfo.h>
 #include <linux/power_supply.h>
 #include <linux/notifier.h>
 #include <linux/fb.h>
@@ -1074,7 +1076,7 @@ static void mxt_esd_reset(struct mxt_data *data)
 	mxt_chip_reset(data);
 }
 
-static void mxt_esd_work(struct work_struct* work)
+static void mxt_esd_work(struct work_struct *work)
 {
 	struct mxt_data *data = container_of(work, struct mxt_data, esd_work);
 
@@ -1716,7 +1718,6 @@ static void mxt_proc_t93_message(struct mxt_data *data, u8 *msg)
 		input_sync(input_dev);
 		input_event(input_dev, EV_KEY, KEY_WAKEUP, 0);
 		input_sync(input_dev);
-
 	}
 }
 
@@ -1771,7 +1772,7 @@ static int mxt_proc_message(struct mxt_data *data, u8 *msg)
 	u8 report_id = msg[0];
 
 	if (report_id == MXT_RPTID_NOMSG)
-		return -1;
+		return -EPERM;
 
 	if (data->debug_enabled)
 		print_hex_dump(KERN_DEBUG, "MXT MSG:", DUMP_PREFIX_NONE, 16, 1,
@@ -2375,7 +2376,7 @@ static const char *mxt_get_config(struct mxt_data *data, bool is_default)
 	}
 
 	for (i = 0; i < pdata->config_array_size; i++) {
-		if (data->info.family_id== pdata->config_array[i].family_id &&
+		if (data->info.family_id == pdata->config_array[i].family_id &&
 			data->info.variant_id == pdata->config_array[i].variant_id &&
 			data->info.version == pdata->config_array[i].version &&
 			data->info.build == pdata->config_array[i].build &&
@@ -2461,44 +2462,6 @@ static int mxt_read_rev(struct mxt_data *data)
 
 		if (val == 0)
 			break;
-		case MXT_TOUCH_MULTI_T9:
-			data->multitouch = MXT_TOUCH_MULTI_T9;
-			/* Only handle messages from first T9 instance */
-			data->T9_reportid_min = min_id;
-			data->T9_reportid_max = min_id +
-						object->num_report_ids - 1;
-			data->num_touchids = object->num_report_ids;
-			break;
-		case MXT_SPT_MESSAGECOUNT_T44:
-			data->T44_address = object->start_address;
-			break;
-		case MXT_SPT_GPIOPWM_T19:
-			data->T19_reportid = min_id;
-			break;
-		case MXT_TOUCH_MULTITOUCHSCREEN_T100:
-			data->multitouch = MXT_TOUCH_MULTITOUCHSCREEN_T100;
-			data->T100_reportid_min = min_id;
-			data->T100_reportid_max = max_id;
-			/* first two report IDs reserved */
-			data->num_touchids = object->num_report_ids - 2;
-			break;
-		}
-
-		end_address = object->start_address
-			+ mxt_obj_size(object) * mxt_obj_instances(object) - 1;
-
-		if (end_address >= data->mem_size)
-			data->mem_size = end_address + 1;
-	}
-
-	/* Store maximum reportid */
-	data->max_reportid = reportid;
-
-	/* If T44 exists, T5 position has to be directly after */
-	if (data->T44_address && (data->T5_address != data->T44_address + 1)) {
-		dev_err(&client->dev, "Invalid T44 position\n");
-		error = -EINVAL;
-		goto free_object_table;
 		i++;
 		msleep(10);
 	}
@@ -2582,7 +2545,7 @@ static int mxt_check_reg_init(struct mxt_data *data)
 {
 	struct device *dev = &data->client->dev;
 	int ret = 0;
-	const char* config_name = NULL;
+	const char *config_name = NULL;
 	bool is_recheck = false, use_default_cfg = false;
 
 	if (data->firmware_updated)
@@ -2657,6 +2620,7 @@ start:
 			dev_err(dev, "No lockdown info stored\n");
 		}
 	}
+	update_hardware_info(TYPE_TP_MAKER, data->panel_id - 0x31);
 	config_name = mxt_get_config(data, use_default_cfg);
 
 	if (data->config_info[0] >= 0x65) {
@@ -3373,7 +3337,7 @@ static int mxt_check_firmware_format(struct device *dev, const struct firmware *
 	  * xxd -r -p mXTXXX__APP_VX-X-XX.enc > maxtouch.fw */
 	dev_err(dev, "Aborting: firmware file must be in binary format\n");
 
-	return -1;
+	return -EPERM;
 }
 
 static void mxt_reset_toggle(struct mxt_data *data)
@@ -3913,7 +3877,7 @@ static bool mxt_self_tune_pass(struct mxt_data *data, bool is_hover_mode)
 	return true;
 }
 
-static void mxt_hover_loading_work(struct work_struct* work)
+static void mxt_hover_loading_work(struct work_struct *work)
 {
 	struct mxt_data *data = container_of(work, struct mxt_data, hover_loading_work);
 	int error = 0;
@@ -3926,7 +3890,7 @@ static void mxt_hover_loading_work(struct work_struct* work)
 	}
 }
 
-static void mxt_self_tuning_work(struct work_struct* work)
+static void mxt_self_tuning_work(struct work_struct *work)
 {
 	struct mxt_data *data = container_of(work, struct mxt_data, self_tuning_work);
 
@@ -4522,12 +4486,12 @@ static ssize_t  mxt_wakeup_mode_store(struct device *dev,
 	if (error)
 		return error;
 
-	if(data->is_suspend) {
-		if(data->wakeup_gesture_mode == 0 && val != 0) {
+	if (data->is_suspend) {
+		if (data->wakeup_gesture_mode == 0 && val != 0) {
 			data->wakeup_gesture_mode = (u8)val;
 			mxt_enable_irq(data);
 			mxt_stop(data);
-		} else if(data->wakeup_gesture_mode != 0 && val == 0) {
+		} else if (data->wakeup_gesture_mode != 0 && val == 0) {
 			mxt_disable_irq(data);
 			mxt_start(data);
 			data->wakeup_gesture_mode = (u8)val;
@@ -4700,7 +4664,7 @@ static ssize_t mxt_mutual_ref_show(struct device *dev,
 	struct mxt_data *data = dev_get_drvdata(dev);
 	int ret, i, j, chan_x, chan_y, max_nodes;
 	u8 x_size, y_size;
-	u16* ref_buf;
+	u16 *ref_buf;
 	ssize_t count;
 
 	if (data->info.family_id == 0xA4 && data->info.variant_id == 0x15) {
@@ -4761,7 +4725,7 @@ static ssize_t mxt_self_ref_show(struct device *dev,
 {
 	struct mxt_data *data = dev_get_drvdata(dev);
 	int ret, i, chan_x, chan_y, max_nodes, even_x_start, odd_x_start;
-	u16* ref_buf;
+	u16 *ref_buf;
 	ssize_t count;
 
 	if (data->info.family_id == 0xA4 && data->info.variant_id == 0x15) {
@@ -4892,7 +4856,7 @@ static ssize_t mxt_irq_enable_store(struct device *dev,
 
 	error = kstrtoul(buf, 0, &val);
 	if (!error) {
-	if(!val)
+	if (!val)
 		disable_irq(data->irq);
 	else
 		enable_irq(data->irq);
@@ -4929,12 +4893,12 @@ static ssize_t mxt_chg_state_show(struct device *dev,
 
 static void mxt_set_wakeup_mode(struct mxt_data *data, u8 val)
 {
-	if(data->is_suspend) {
-		if(data->wakeup_gesture_mode == 0 && val != 0) {
+	if (data->is_suspend) {
+		if (data->wakeup_gesture_mode == 0 && val != 0) {
 			data->wakeup_gesture_mode = (u8)val;
 			mxt_enable_irq(data);
 			mxt_stop(data);
-		} else if(data->wakeup_gesture_mode != 0 && val == 0) {
+		} else if (data->wakeup_gesture_mode != 0 && val == 0) {
 			mxt_disable_irq(data);
 			mxt_start(data);
 			data->wakeup_gesture_mode = (u8)val;
@@ -4959,7 +4923,6 @@ static void mxt_switch_mode_work(struct work_struct *work)
 				value == MXT_INPUT_EVENT_WAKUP_MODE_OFF) {
 		if (pdata->config_array[index].wake_up_self_adcx != 0) {
 			mxt_set_wakeup_mode(data, value - MXT_INPUT_EVENT_WAKUP_MODE_OFF);
-
 		}
 	} else if (value == MXT_INPUT_EVENT_COVER_MODE_ON ||
 				value == MXT_INPUT_EVENT_COVER_MODE_OFF)
@@ -6343,7 +6306,7 @@ static void charger_noise_set(struct mxt_data *data)
 		}
 	}
 }
-static void mxt_noise_work(struct work_struct* work)
+static void mxt_noise_work(struct work_struct *work)
 {
 	struct mxt_data *data = container_of(work, struct mxt_data, noise_work);
 	charger_noise_set(data);
@@ -6787,6 +6750,7 @@ static int mxt_probe(struct i2c_client *client,
 	mxt_debugfs_init(data);
 
 	normal_mode_reg_save(data);
+	update_hardware_info(TYPE_TOUCH, 2);
 	data->finish_init = 1;
 
 	proc_create("tp_selftest", 0664, NULL, &mxt_selftest_ops);
