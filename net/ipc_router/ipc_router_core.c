@@ -1360,7 +1360,7 @@ msm_ipc_router_create_raw_port(void *endpoint,
 		 port_ptr->this_port.port_id,
 		 task_pid_nr(current),
 		 current->comm);
-	port_ptr->port_rx_ws = wakeup_source_register(port_ptr->rx_ws_name);
+	port_ptr->port_rx_ws = wakeup_source_register(NULL, port_ptr->rx_ws_name);
 	if (!port_ptr->port_rx_ws) {
 		kfree(port_ptr);
 		return NULL;
