@@ -150,6 +150,14 @@ static void call_hvc_arch_workaround_1(void)
 	arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_1, NULL);
 }
 
+static bool __nospectre_v2;
+static int __init parse_nospectre_v2(char *str)
+{
+	__nospectre_v2 = true;
+	return 0;
+}
+early_param("nospectre_v2", parse_nospectre_v2);
+
 static void
 enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
 {
@@ -159,6 +167,11 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
 
 	if (!entry->matches(entry, SCOPE_LOCAL_CPU))
 		return;
+
+	if (__nospectre_v2) {
+		pr_info_once("spectrev2 mitigation disabled by command line option\n");
+		return;
+	}
 
 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
 		return;
