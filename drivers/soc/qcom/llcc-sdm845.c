@@ -93,6 +93,7 @@ static struct platform_driver sdm845_qcom_llcc_driver = {
 		.name = "sdm845-llcc",
 		.owner = THIS_MODULE,
 		.of_match_table = sdm845_qcom_llcc_of_match,
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 	.probe = sdm845_qcom_llcc_probe,
 	.remove = qcom_llcc_remove,
