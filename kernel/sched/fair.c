@@ -7316,9 +7316,11 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 			 * task. If so, add just the boost-utilization to
 			 * the cumulative demand of the cpu.
 			 */
+#ifdef CONFIG_SCHED_WALT
 			if (task_in_cum_window_demand(cpu_rq(i), p))
 				new_util_cuml = cpu_util_cum(i, 0) +
 					       min_util - task_util(p);
+#endif
 			else
 				new_util_cuml = cpu_util_cum(i, 0) + min_util;
 
