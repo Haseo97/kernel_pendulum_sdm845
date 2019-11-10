@@ -17,8 +17,7 @@
 #include <linux/idr.h>
 #include <linux/pm_qos.h>
 #include <linux/sched.h>
-#include <linux/sched/task.h>
-#include <linux/sched/mm.h>
+#include <linux/mm.h>
 
 #include "kgsl.h"
 #include "kgsl_mmu.h"
