@@ -83,19 +83,19 @@ ifeq ($(CONFIG_COMPAT_VDSO), y)
 endif
 
 ifeq ($(cc-name),clang)
-KBUILD_CFLAGS	+= -mllvm -polly \
-		   -mllvm -polly-omp-backend=LLVM \
-		   -mllvm -polly-scheduling=dynamic \
-		   -mllvm -polly-scheduling-chunksize=1 \
-		   -mllvm -polly-vectorizer=polly \
-		   -mllvm -polly-opt-fusion=max \
-		   -mllvm -polly-opt-maximize-bands=yes \
-		   -mllvm -polly-run-dce \
-		   -mllvm -polly-position=after-loopopt \
-		   -mllvm -polly-run-inliner \
-		   -mllvm -polly-detect-keep-going \
-		   -mllvm -polly-opt-simplify-deps=no \
-		   -mllvm -polly-rtc-max-arrays-per-group=40
+KBUILD_CFLAGS	+= $(call cc-option,-mllvm -polly) \
+		   $(call cc-option,-mllvm -polly-omp-backend=LLVM) \
+		   $(call cc-option,-mllvm -polly-scheduling=dynamic) \
+		   $(call cc-option,-mllvm -polly-scheduling-chunksize=1) \
+		   $(call cc-option,-mllvm -polly-vectorizer=polly) \
+		   $(call cc-option,-mllvm -polly-opt-fusion=max) \
+		   $(call cc-option,-mllvm -polly-opt-maximize-bands=yes) \
+		   $(call cc-option,-mllvm -polly-run-dce) \
+		   $(call cc-option,-mllvm -polly-position=after-loopopt) \
+		   $(call cc-option,-mllvm -polly-run-inliner) \
+		   $(call cc-option,-mllvm -polly-detect-keep-going) \
+		   $(call cc-option,-mllvm -polly-opt-simplify-deps=no) \
+		   $(call cc-option,-mllvm -polly-rtc-max-arrays-per-group=40)
 endif
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(vdso32)
