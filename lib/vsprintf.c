@@ -1570,7 +1570,7 @@ static int __init initialize_ptr_random(void)
 }
 early_initcall(initialize_ptr_random);
 
-int ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
+static inline int __ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
 {
 	unsigned long hashval;
 
@@ -1591,6 +1591,11 @@ int ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
 	return 0;
 }
 
+int ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
+{
+	return __ptr_to_hashval(ptr, hashval_out);
+}
+
 /* Maps a pointer to a 32 bit unique identifier. */
 static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 {
@@ -1601,7 +1606,7 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 	if (unlikely(!have_filled_random_ptr_key)) {
 		spec.field_width = default_width;
 
-	ret = ptr_to_hashval(ptr, &hashval);
+	ret = __ptr_to_hashval(ptr, &hashval);
 	if (ret) {
 		/* string length must be less than default_width */
 		return string(buf, end, "(ptrval)", spec);
