@@ -1570,17 +1570,12 @@ static int __init initialize_ptr_random(void)
 }
 early_initcall(initialize_ptr_random);
 
-/* Maps a pointer to a 32 bit unique identifier. */
-static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
+int ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
 {
 	unsigned long hashval;
-	const int default_width = 2 * sizeof(ptr);
 
-	if (unlikely(!have_filled_random_ptr_key)) {
-		spec.field_width = default_width;
-		/* string length must be less than default_width */
-		return string(buf, end, "(ptrval)", spec);
-	}
+	if (static_branch_unlikely(&not_filled_random_ptr_key))
+		return -EAGAIN;
 
 #ifdef CONFIG_64BIT
 	hashval = (unsigned long)siphash_1u64((u64)ptr, &ptr_key);
@@ -1592,6 +1587,25 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 #else
 	hashval = (unsigned long)siphash_1u32((u32)ptr, &ptr_key);
 #endif
+	*hashval_out = hashval;
+	return 0;
+}
+
+/* Maps a pointer to a 32 bit unique identifier. */
+static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
+{
+	unsigned long hashval;
+	int ret;
+	const int default_width = 2 * sizeof(ptr);
+
+	if (unlikely(!have_filled_random_ptr_key)) {
+		spec.field_width = default_width;
+
+	ret = ptr_to_hashval(ptr, &hashval);
+	if (ret) {
+		/* string length must be less than default_width */
+		return string(buf, end, "(ptrval)", spec);
+	}
 
 	spec.flags |= SMALL;
 	if (spec.field_width == -1) {
