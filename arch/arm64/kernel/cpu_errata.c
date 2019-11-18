@@ -171,9 +171,6 @@ static int detect_harden_bp_fw(void)
 			break;
 		default:
 			return -1;
-		cb = call_hvc_arch_workaround_1;
-		smccc_start = __smccc_workaround_1_hvc_start;
-		smccc_end = __smccc_workaround_1_hvc_end;
 		}
 		break;
 
