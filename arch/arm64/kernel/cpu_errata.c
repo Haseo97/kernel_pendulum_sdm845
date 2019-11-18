@@ -23,11 +23,11 @@
 #include <asm/cpufeature.h>
 
 static bool __maybe_unused
-is_affected_midr_range_list(const struct arm64_cpu_capabilities *entry,
+is_affected_midr_range(const struct arm64_cpu_capabilities *entry,
 			    int scope)
 {
 	WARN_ON(scope != SCOPE_LOCAL_CPU || preemptible());
-	return is_midr_in_range_list(read_cpuid_id(), entry->midr_range_list);
+	return is_midr_in_range(read_cpuid_id(), &entry->midr_range);
 }
 
 static bool
@@ -549,16 +549,6 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
 		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
 		.matches = check_branch_predictor,
-	},
-	{
-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-		ERRATA_MIDR_ALL_VERSIONS(MIDR_KRYO3G),
-		.cpu_enable = enable_smccc_arch_workaround_1,
-	},
-	{
-		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-		ERRATA_MIDR_ALL_VERSIONS(MIDR_KRYO2XX_GOLD),
-		.cpu_enable = enable_smccc_arch_workaround_1,
 	},
 	{
 		.desc = "Speculative Store Bypass Disable",
