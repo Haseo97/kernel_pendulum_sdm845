@@ -1574,7 +1574,7 @@ static inline int __ptr_to_hashval(const void *ptr, unsigned long *hashval_out)
 {
 	unsigned long hashval;
 
-	if (static_branch_unlikely(&not_filled_random_ptr_key))
+	if (unlikely(!have_filled_random_ptr_key))
 		return -EAGAIN;
 
 #ifdef CONFIG_64BIT
@@ -1603,11 +1603,9 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 	int ret;
 	const int default_width = 2 * sizeof(ptr);
 
-	if (unlikely(!have_filled_random_ptr_key)) {
-		spec.field_width = default_width;
-
 	ret = __ptr_to_hashval(ptr, &hashval);
 	if (ret) {
+		spec.field_width = default_width;
 		/* string length must be less than default_width */
 		return string(buf, end, "(ptrval)", spec);
 	}
