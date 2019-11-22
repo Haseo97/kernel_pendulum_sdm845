@@ -221,9 +221,9 @@ struct cam_hw_config_args {
 struct cam_hw_flush_args {
 	void                           *ctxt_to_hw_map;
 	uint32_t                        num_req_pending;
-	void                           *flush_req_pending[20];
+	void                           *flush_req_pending[48];
 	uint32_t                        num_req_active;
-	void                           *flush_req_active[20];
+	void                           *flush_req_active[48];
 	enum flush_type_t               flush_type;
 };
 
@@ -245,11 +245,20 @@ struct cam_hw_dump_pf_args {
 	bool                           *mem_found;
 };
 
+/**
+ * struct cam_hw_reset_args -hw reset arguments
+ *
+ * @ctxt_to_hw_map:        HW context from the acquire
+ *
+ */
+struct cam_hw_reset_args {
+	void                           *ctxt_to_hw_map;
+};
+
 /* enum cam_hw_mgr_command - Hardware manager command type */
 enum cam_hw_mgr_command {
 	CAM_HW_MGR_CMD_INTERNAL,
 	CAM_HW_MGR_CMD_DUMP_PF_INFO,
-	CAM_HW_MGR_CMD_GET_TIMESTAMP_TH,
 };
 
 /**
@@ -267,7 +276,6 @@ struct cam_hw_cmd_args {
 	union {
 		void                       *internal_args;
 		struct cam_hw_dump_pf_args  pf_args;
-		uint64_t                    irq_timestamps_th;
 	} u;
 };
 
@@ -296,6 +304,7 @@ struct cam_hw_cmd_args {
  * @hw_open:               Function pointer for HW init
  * @hw_close:              Function pointer for HW deinit
  * @hw_flush:              Function pointer for HW flush
+ * @hw_reset:              Function pointer for HW reset
  *
  */
 struct cam_hw_mgr_intf {
@@ -314,6 +323,7 @@ struct cam_hw_mgr_intf {
 	int (*hw_open)(void *hw_priv, void *fw_download_args);
 	int (*hw_close)(void *hw_priv, void *hw_close_args);
 	int (*hw_flush)(void *hw_priv, void *hw_flush_args);
+	int (*hw_reset)(void *hw_priv, void *hw_reset_args);
 };
 
 #endif /* _CAM_HW_MGR_INTF_H_ */

@@ -475,6 +475,7 @@ static int cam_ife_csid_global_reset(struct cam_ife_csid_hw *csid_hw)
 		CAM_ERR(CAM_ISP, "CSID:%d IRQ value after reset rc = %d",
 			csid_hw->hw_intf->hw_idx, val);
 	csid_hw->error_irq_count = 0;
+	csid_hw->first_sof_ts = 0;
 
 	for (i = 0 ; i < CAM_IFE_PIX_PATH_RES_MAX; i++)
 		csid_hw->res_sof_cnt[i] = 0;
@@ -1172,6 +1173,7 @@ static int cam_ife_csid_disable_hw(struct cam_ife_csid_hw *csid_hw)
 
 	csid_hw->hw_info->hw_state = CAM_HW_STATE_POWER_DOWN;
 	csid_hw->error_irq_count = 0;
+	csid_hw->first_sof_ts = 0;
 
 	return rc;
 }
@@ -1882,12 +1884,10 @@ static int cam_ife_csid_enable_pxl_path(
 		is_ipp = true;
 		pxl_reg = csid_reg->ipp_reg;
 		path_config = &(csid_hw->ipp_path_config);
-		csid_hw->res_sof_cnt[CAM_IFE_PIX_PATH_RES_IPP] = 0;
 	} else {
 		is_ipp = false;
 		pxl_reg = csid_reg->ppp_reg;
 		path_config = &(csid_hw->ppp_path_config);
-		csid_hw->res_sof_cnt[CAM_IFE_PIX_PATH_RES_PPP] = 0;
 	}
 
 	if (res->res_state != CAM_ISP_RESOURCE_STATE_INIT_HW) {
@@ -2288,7 +2288,6 @@ static int cam_ife_csid_enable_rdi_path(
 			res->res_type, res->res_id, res->res_state);
 		return -EINVAL;
 	}
-	csid_hw->res_sof_cnt[res->res_id] = 0;
 
 	if (path_data->usage_type)
 		path_data->init_frame_drop = csid_hw->init_frame_drop + 1;
@@ -2555,9 +2554,16 @@ static int cam_ife_csid_get_time_stamp(
 		CAM_IFE_CSID_QTIMER_MUL_FACTOR,
 		CAM_IFE_CSID_QTIMER_DIV_FACTOR);
 
-	get_monotonic_boottime64(&ts);
-	time_stamp->boot_timestamp = (uint64_t)((ts.tv_sec * 1000000000) +
-		ts.tv_nsec);
+	if (!csid_hw->first_sof_ts) {
+		get_monotonic_boottime64(&ts);
+		time_stamp->boot_timestamp =
+			(uint64_t)((ts.tv_sec * 1000000000) +
+			ts.tv_nsec);
+		CAM_DBG(CAM_ISP, "timestamp:%lld",
+			time_stamp->boot_timestamp);
+		csid_hw->first_sof_ts = 1;
+	} else
+		time_stamp->boot_timestamp = 0;
 
 	return 0;
 }

@@ -64,6 +64,10 @@ int cam_cci_init(struct v4l2_subdev *sd,
 		cci_dev->cci_state = CCI_STATE_ENABLED;
 		if (master < MASTER_MAX && master >= 0) {
 			mutex_lock(&cci_dev->cci_master_info[master].mutex);
+			mutex_lock(&cci_dev->
+				cci_master_info[master].mutex_q[QUEUE_0]);
+			mutex_lock(&cci_dev->
+				cci_master_info[master].mutex_q[QUEUE_1]);
 			flush_workqueue(cci_dev->write_wq[master]);
 			/* Re-initialize the completion */
 			reinit_completion(
@@ -86,6 +90,10 @@ int cam_cci_init(struct v4l2_subdev *sd,
 				CCI_TIMEOUT);
 			if (rc <= 0)
 				CAM_ERR(CAM_CCI, "wait failed %d", rc);
+			mutex_unlock(&cci_dev->
+				cci_master_info[master].mutex_q[QUEUE_1]);
+			mutex_unlock(&cci_dev->
+				cci_master_info[master].mutex_q[QUEUE_0]);
 			mutex_unlock(&cci_dev->cci_master_info[master].mutex);
 		}
 		return 0;
@@ -98,9 +106,9 @@ int cam_cci_init(struct v4l2_subdev *sd,
 
 	rc = cam_cpas_start(cci_dev->cpas_handle,
 		&ahb_vote, &axi_vote);
-	if (rc != 0)
+	if (rc != 0) {
 		CAM_ERR(CAM_CCI, "CPAS start failed");
-
+	}
 	cam_cci_get_clk_rates(cci_dev, c_ctrl);
 
 	/* Re-initialize the completion */
@@ -224,8 +232,6 @@ static void cam_cci_init_cci_params(struct cci_device *new_cci_dev)
 				&new_cci_dev->cci_master_info[i].lock_q[j]);
 		}
 	}
-	mutex_init(&new_cci_dev->init_mutex);
-	new_cci_dev->cci_state = CCI_STATE_DISABLED;
 	spin_lock_init(&new_cci_dev->lock_status);
 }
 

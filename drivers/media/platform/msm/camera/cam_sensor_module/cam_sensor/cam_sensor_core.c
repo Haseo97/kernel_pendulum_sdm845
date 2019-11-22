@@ -11,7 +11,6 @@
  */
 
 #include <linux/module.h>
-#include <linux/pm_qos.h>
 #include <cam_sensor_cmn_header.h>
 #include "cam_sensor_core.h"
 #include "cam_sensor_util.h"
@@ -20,25 +19,6 @@
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
 
-#define CAMERA_DISABLE_PC_LATENCY 100
-#define CAMERA_ENABLE_PC_LATENCY PM_QOS_DEFAULT_VALUE
-
-static struct pm_qos_request cam_pm_qos_request;
-static int g_sensor_open_cnt;
-static void cam_pm_qos_disable_pc(void)
-{
-	CAM_INFO(CAM_SENSOR, "disable power collapse");
-	pm_qos_add_request(&cam_pm_qos_request, PM_QOS_CPU_DMA_LATENCY,
-		PM_QOS_DEFAULT_VALUE);
-	pm_qos_update_request(&cam_pm_qos_request, CAMERA_DISABLE_PC_LATENCY);
-}
-
-static void cam_pm_qos_enable_pc(void)
-{
-	pm_qos_update_request(&cam_pm_qos_request, CAMERA_ENABLE_PC_LATENCY);
-	pm_qos_remove_request(&cam_pm_qos_request);
-	CAM_INFO(CAM_SENSOR, "enable power collapse");
-}
 
 #if MV_TEMP_SET
 #define IR_CAMERA_ID	3
@@ -625,6 +605,8 @@ void cam_sensor_query_cap(struct cam_sensor_ctrl_t *s_ctrl,
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_LED_FLASH];
 	query_cap->ois_slot_id =
 		s_ctrl->sensordata->subdev_id[SUB_MODULE_OIS];
+	query_cap->ir_led_slot_id =
+		s_ctrl->sensordata->subdev_id[SUB_MODULE_IR_LED];
 	query_cap->slot_info =
 		s_ctrl->soc_info.index;
 }
@@ -669,7 +651,6 @@ void cam_sensor_shutdown(struct cam_sensor_ctrl_t *s_ctrl)
 	s_ctrl->bridge_intf.device_hdl = -1;
 	s_ctrl->bridge_intf.link_hdl = -1;
 	s_ctrl->bridge_intf.session_hdl = -1;
-
 	kfree(power_info->power_setting);
 	kfree(power_info->power_down_setting);
 
@@ -1127,19 +1108,6 @@ int32_t cam_sensor_driver_cmd(struct cam_sensor_ctrl_t *s_ctrl,
 	}
 
 release_mutex:
-	if (0 == rc && cmd->op_code == CAM_ACQUIRE_DEV) {
-		if (g_sensor_open_cnt == 0)
-			cam_pm_qos_disable_pc();
-
-		g_sensor_open_cnt++;
-	} else if (cmd->op_code == CAM_RELEASE_DEV) {
-		if (g_sensor_open_cnt > 0)
-			g_sensor_open_cnt--;
-
-		if (g_sensor_open_cnt == 0)
-			cam_pm_qos_enable_pc();
-
-	}
 	mutex_unlock(&(s_ctrl->cam_sensor_mutex));
 	return rc;
 }

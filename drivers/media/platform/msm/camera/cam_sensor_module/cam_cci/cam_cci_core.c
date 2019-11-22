@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -441,12 +441,12 @@ static int32_t cam_cci_calc_cmd_len(struct cci_device *cci_dev,
 	struct cam_cci_ctrl *c_ctrl, uint32_t cmd_size,
 	 struct cam_sensor_i2c_reg_array *i2c_cmd, uint32_t *pack)
 {
-	uint8_t __maybe_unused i;
+	uint8_t i;
 	uint32_t len = 0;
 	uint8_t data_len = 0, addr_len = 0;
 	uint8_t pack_max_len;
 	struct cam_sensor_i2c_reg_setting *msg;
-	struct cam_sensor_i2c_reg_array __maybe_unused *cmd = i2c_cmd;
+	struct cam_sensor_i2c_reg_array *cmd = i2c_cmd;
 	uint32_t size = cmd_size;
 
 	if (!cci_dev || !c_ctrl) {
@@ -561,6 +561,7 @@ void cam_cci_get_clk_rates(struct cci_device *cci_dev,
 			return;
 		}
 	}
+	return;
 }
 
 static int32_t cam_cci_set_clk_param(struct cci_device *cci_dev,
@@ -1609,27 +1610,16 @@ int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 	struct cam_cci_ctrl *cci_ctrl)
 {
 	int32_t rc = 0;
-	struct cci_device *cci_dev;
-
-	cci_dev = v4l2_get_subdevdata(sd);
-	if (!cci_dev || !cci_ctrl) {
-		CAM_ERR(CAM_CCI, "failed: invalid params %pK %pK",
-			cci_dev, cci_ctrl);
-		rc = -EINVAL;
-		return rc;
-	}
+	struct cci_device *cci_dev = v4l2_get_subdevdata(sd);
 
 	CAM_DBG(CAM_CCI, "cmd %d", cci_ctrl->cmd);
+	mutex_lock(&cci_dev->mutex);
 	switch (cci_ctrl->cmd) {
 	case MSM_CCI_INIT:
-		mutex_lock(&cci_dev->init_mutex);
 		rc = cam_cci_init(sd, cci_ctrl);
-		mutex_unlock(&cci_dev->init_mutex);
 		break;
 	case MSM_CCI_RELEASE:
-		mutex_lock(&cci_dev->init_mutex);
 		rc = cam_cci_release(sd, cci_ctrl);
-		mutex_unlock(&cci_dev->init_mutex);
 		break;
 	case MSM_CCI_I2C_READ:
 		rc = cam_cci_read_bytes(sd, cci_ctrl);
@@ -1651,6 +1641,7 @@ int32_t cam_cci_core_cfg(struct v4l2_subdev *sd,
 	default:
 		rc = -ENOIOCTLCMD;
 	}
+	mutex_unlock(&cci_dev->mutex);
 
 	cci_ctrl->status = rc;
 

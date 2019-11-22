@@ -612,7 +612,7 @@ static void cam_jpeg_mgr_print_io_bufs(struct cam_packet *packet,
 	int32_t iommu_hdl, int32_t sec_mmu_hdl, uint32_t pf_buf_info,
 	bool *mem_found)
 {
-	uint64_t   iova_addr;
+	dma_addr_t iova_addr;
 	size_t     src_buf_size;
 	int        i;
 	int        j;
@@ -655,11 +655,6 @@ static void cam_jpeg_mgr_print_io_bufs(struct cam_packet *packet,
 				mmu_hdl, &iova_addr, &src_buf_size);
 			if (rc < 0) {
 				CAM_ERR(CAM_UTIL, "get src buf address fail");
-				continue;
-			}
-			if (iova_addr >> 32) {
-				CAM_ERR(CAM_JPEG, "Invalid mapped address");
-				rc = -EINVAL;
 				continue;
 			}
 
@@ -1359,8 +1354,8 @@ static int cam_jpeg_init_devices(struct device_node *of_node,
 	uint32_t *p_num_dma_dev)
 {
 	int count, i, rc;
-	uint32_t num_dev;
-	uint32_t num_dma_dev;
+	uint32_t num_dev = 0;
+	uint32_t num_dma_dev = 0;
 	const char *name = NULL;
 	struct device_node *child_node = NULL;
 	struct platform_device *child_pdev = NULL;
@@ -1518,8 +1513,8 @@ int cam_jpeg_hw_mgr_init(struct device_node *of_node, uint64_t *hw_mgr_hdl,
 	int *iommu_hdl)
 {
 	int i, rc;
-	uint32_t num_dev = 0;
-	uint32_t num_dma_dev = 0;
+	uint32_t num_dev;
+	uint32_t num_dma_dev;
 	struct cam_hw_mgr_intf *hw_mgr_intf;
 	struct cam_iommu_handle cdm_handles;
 

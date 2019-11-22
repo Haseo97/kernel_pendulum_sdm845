@@ -3640,7 +3640,7 @@ static void cam_icp_mgr_print_io_bufs(struct cam_packet *packet,
 	int32_t iommu_hdl, int32_t sec_mmu_hdl, uint32_t pf_buf_info,
 	bool *mem_found)
 {
-	uint64_t   iova_addr;
+	dma_addr_t iova_addr;
 	size_t     src_buf_size;
 	int        i;
 	int        j;
@@ -3684,11 +3684,6 @@ static void cam_icp_mgr_print_io_bufs(struct cam_packet *packet,
 				mmu_hdl, &iova_addr, &src_buf_size);
 			if (rc < 0) {
 				CAM_ERR(CAM_UTIL, "get src buf address fail");
-				continue;
-			}
-			if (iova_addr >> 32) {
-				CAM_ERR(CAM_ICP, "Invalid mapped address");
-				rc = -EINVAL;
 				continue;
 			}
 
@@ -4222,6 +4217,12 @@ static int cam_icp_get_acquire_info(struct cam_icp_hw_mgr *hw_mgr,
 		return -EFAULT;
 	}
 
+	/* To make sure num_out_res is same as allocated */
+	if (ctx_data->icp_dev_acquire_info->num_out_res !=
+		icp_dev_acquire_info.num_out_res) {
+		CAM_ERR(CAM_ICP, "num_out_res got changed");
+		return -EFAULT;
+	}
 	CAM_DBG(CAM_ICP, "%x %x %x %x %x %x %x %u",
 		ctx_data->icp_dev_acquire_info->dev_type,
 		ctx_data->icp_dev_acquire_info->in_res.format,
@@ -4639,7 +4640,7 @@ static int cam_icp_mgr_create_wq(void)
 		goto debugfs_create_failed;
 
 	icp_hw_mgr.icp_pc_flag = true;
-	icp_hw_mgr.ipe_bps_pc_flag = false;
+	icp_hw_mgr.ipe_bps_pc_flag = true;
 
 	for (i = 0; i < ICP_WORKQ_NUM_TASK; i++)
 		icp_hw_mgr.msg_work->task.pool[i].payload =

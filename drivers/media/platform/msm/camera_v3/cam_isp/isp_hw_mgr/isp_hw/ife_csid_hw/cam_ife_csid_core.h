@@ -490,7 +490,6 @@ struct cam_ife_csid_path_cfg {
  * @init_frame_drop           Initial frame drop number
  * @res_sof_cnt               path resource sof count value. it used for initial
  *                            frame drop
- *
  * @first_sof_ts              flag to mark the first sof has been registered
  * @ppi_hw_intf               interface to ppi hardware
  * @ppi_enabled               flag to specify if the hardware has ppi bridge
