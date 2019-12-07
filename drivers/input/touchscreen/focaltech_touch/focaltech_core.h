@@ -91,8 +91,8 @@
 #define FTS_TOUCH_DOWN                      0
 #define FTS_TOUCH_UP                        1
 #define FTS_TOUCH_CONTACT                   2
-#define EVENT_DOWN(flag)                    ((FTS_TOUCH_DOWN == flag) || (flag == FTS_TOUCH_CONTACT))
-#define EVENT_UP(flag)                      (flag == FTS_TOUCH_UP)
+#define EVENT_DOWN(flag)                    ((FTS_TOUCH_DOWN == flag) || (FTS_TOUCH_CONTACT == flag))
+#define EVENT_UP(flag)                      (FTS_TOUCH_UP == flag)
 #define EVENT_NO_DOWN(data)                 (!data->point_num)
 #define KEY_EN(data)                        (data->pdata->have_key)
 #define TOUCH_IS_KEY(y, key_y)              (y == key_y)
@@ -167,6 +167,7 @@ struct fts_ts_data {
 	u8 lockdown_info[FTS_LOCKDOWN_INFO_SIZE];
 	bool dev_pm_suspend;
 	bool lpwg_mode;
+	bool fw_forceupdate;
 	struct work_struct suspend_work;
 	struct work_struct resume_work;
 	struct workqueue_struct *event_wq;
@@ -179,6 +180,8 @@ struct fts_ts_data {
 #endif
 #ifdef CONFIG_DRM
 	struct notifier_block fb_notif;
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+	struct early_suspend early_suspend;
 #endif
 	struct dentry *debugfs;
 	struct proc_dir_entry *tp_selftest_proc;

@@ -37,6 +37,9 @@
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #include <drm/drm_notifier.h>
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#define FTS_SUSPEND_LEVEL 1	/* Early-suspend level */
 #endif
 #include <linux/hwinfo.h>
 
@@ -127,14 +130,14 @@ static int fts_get_chip_types(struct fts_ts_data *ts_data, u8 id_h, u8 id_l, boo
 	struct ft_chip_t ctype[] = FTS_CHIP_TYPE_MAPPING;
 	u32 ctype_entries = sizeof(ctype) / sizeof(struct ft_chip_t);
 
-	if ((0x0 == id_h) || (id_l == 0x0)) {
+	if ((0x0 == id_h) || (0x0 == id_l)) {
 		FTS_ERROR("id_h/id_l is 0");
 		return -EINVAL;
 	}
 
 	FTS_DEBUG("verify id:0x%02x%02x", id_h, id_l);
 	for (i = 0; i < ctype_entries; i++) {
-		if (fw_valid == VALID) {
+		if (VALID == fw_valid) {
 			if ((id_h == ctype[i].chip_idh) && (id_l == ctype[i].chip_idl))
 				break;
 		} else {
@@ -174,7 +177,7 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
 	do {
 		ret = fts_i2c_read_reg(client, FTS_REG_CHIP_ID, &chip_id[0]);
 		ret = fts_i2c_read_reg(client, FTS_REG_CHIP_ID2, &chip_id[1]);
-		if ((ret < 0) || (0x0 == chip_id[0]) || (chip_id[1] == 0x0)) {
+		if ((ret < 0) || (0x0 == chip_id[0]) || (0x0 == chip_id[1])) {
 			FTS_DEBUG("i2c read invalid, read:0x%02x%02x", chip_id[0], chip_id[1]);
 		} else {
 			ret = fts_get_chip_types(ts_data, chip_id[0], chip_id[1], VALID);
@@ -210,7 +213,7 @@ static int fts_get_ic_information(struct fts_ts_data *ts_data)
 		else
 			id_cmd_len = FTS_CMD_READ_ID_LEN;
 		ret = fts_i2c_read(client, id_cmd, id_cmd_len, chip_id, 2);
-		if ((ret < 0) || (0x0 == chip_id[0]) || (chip_id[1] == 0x0)) {
+		if ((ret < 0) || (0x0 == chip_id[0]) || (0x0 == chip_id[1])) {
 			FTS_ERROR("read boot id fail");
 			return -EIO;
 		}
@@ -809,7 +812,7 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 	struct i2c_client *client = data->client;
 
 #if FTS_GESTURE_EN
-	if (fts_gesture_readdata(data) == 0) {
+	if (0 == fts_gesture_readdata(data)) {
 		FTS_INFO("succuss to get gesture data in irq handler");
 		return 1;
 	}
@@ -956,7 +959,7 @@ static int fts_irq_registration(struct fts_ts_data *ts_data)
 	if (ts_data->irq != ts_data->client->irq)
 		FTS_ERROR("IRQs are inconsistent, please check <interrupts> & <focaltech,irq-gpio> in DTS");
 
-	if (pdata->irq_gpio_flags == 0)
+	if (0 == pdata->irq_gpio_flags)
 		pdata->irq_gpio_flags = IRQF_TRIGGER_FALLING;
 	FTS_INFO("irq flag:%x", pdata->irq_gpio_flags);
 	ret =
@@ -976,7 +979,7 @@ static void fts_switch_mode_work(struct work_struct *work)
 	FTS_INFO("%s mode %d", __func__, value);
 
 	if (value >= INPUT_EVENT_WAKUP_MODE_OFF && value <= INPUT_EVENT_WAKUP_MODE_ON) {
-		enable = !!(value - INPUT_EVENT_WAKUP_MODE_OFF);
+		enable = ! !(value - INPUT_EVENT_WAKUP_MODE_OFF);
 		fts_gesture_enable(enable);
 		ms->ts_data->lpwg_mode = enable;
 	}
@@ -1086,7 +1089,7 @@ static int fts_input_init(struct fts_ts_data *ts_data)
 		goto err_point_buf;
 	}
 
-	ts_data->events = kcalloc(point_num, sizeof(struct ts_event), GFP_KERNEL);
+	ts_data->events = (struct ts_event *)kzalloc(point_num * sizeof(struct ts_event), GFP_KERNEL);
 	if (!ts_data->events) {
 
 		FTS_ERROR("failed to alloc memory for point events!");
@@ -1285,7 +1288,7 @@ static int fts_parse_dt(struct device *dev, struct fts_ts_platform_data *pdata)
 		FTS_ERROR("Unable to get irq_gpio");
 
 	ret = of_property_read_u32(np, "focaltech,max-touch-number", &temp_val);
-	if (ret == 0) {
+	if (0 == ret) {
 		if (temp_val < 2)
 			pdata->max_touch_number = 2;
 		else if (temp_val > FTS_MAX_POINTS_SUPPORT)
@@ -1529,7 +1532,73 @@ static int fb_notifier_callback(struct notifier_block *self, unsigned long event
 
 	return 0;
 }
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+/*****************************************************************************
+*  Name: fts_ts_early_suspend
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static void fts_ts_early_suspend(struct early_suspend *handler)
+{
+	struct fts_ts_data *data = container_of(handler,
+						struct fts_ts_data,
+						early_suspend);
+
+	fts_ts_suspend(&data->client->dev);
+}
+
+/*****************************************************************************
+*  Name: fts_ts_late_resume
+*  Brief:
+*  Input:
+*  Output:
+*  Return:
+*****************************************************************************/
+static void fts_ts_late_resume(struct early_suspend *handler)
+{
+	struct fts_ts_data *data = container_of(handler,
+						struct fts_ts_data,
+						early_suspend);
+
+	fts_ts_resume(&data->client->dev);
+}
 #endif
+
+static int check_is_focal_touch(struct fts_ts_data *ts_data)
+{
+	int ret = false;
+	u8 cmd[4] = { 0 };
+	u32 cmd_len = 0;
+	u8 val[2] = { 0 };
+
+	fts_reset_proc(10);
+	cmd[0] = FTS_CMD_START1;
+	cmd[1] = FTS_CMD_START2;
+	ret = fts_i2c_write(ts_data->client, cmd, 2);
+
+	if (ret < 0) {
+		FTS_ERROR("write 55 aa cmd fail");
+		return false;
+	}
+
+	msleep(FTS_CMD_START_DELAY);
+	cmd[0] = FTS_CMD_READ_ID;
+	cmd[1] = cmd[2] = cmd[3] = 0x00;
+
+	cmd_len = FTS_CMD_READ_ID_LEN_INCELL;
+
+	ret = fts_i2c_read(ts_data->client, cmd, cmd_len, val, 2);
+	if (ret < 0) {
+		FTS_ERROR("write 90 cmd fail");
+		return false;
+	}
+
+	FTS_INFO("read boot id:0x%02x%02x", val[0], val[1]);
+
+	return true;
+}
 
 /*****************************************************************************
 *  Name: fts_ts_probe
@@ -1581,7 +1650,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	i2c_set_clientdata(client, ts_data);
 
 	ts_data->ts_workqueue = create_singlethread_workqueue("fts_wq");
-	if (ts_data->ts_workqueue == NULL) {
+	if (NULL == ts_data->ts_workqueue) {
 		FTS_ERROR("failed to create fts workqueue");
 	}
 
@@ -1608,7 +1677,7 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	}
 #if FTS_PINCTRL_EN
 	ret = fts_pinctrl_init(ts_data);
-	if (ret == 0) {
+	if (0 == ret) {
 		fts_pinctrl_select_normal(ts_data);
 	}
 #endif
@@ -1625,8 +1694,14 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 
 	ret = fts_get_ic_information(ts_data);
 	if (ret) {
-		FTS_ERROR("not focal IC, unregister driver");
-		goto err_irq_req;
+		FTS_ERROR("can't get ic information");
+		ret = check_is_focal_touch(ts_data);
+		if (ret)
+			ts_data->fw_forceupdate = true;
+		else {
+			FTS_ERROR("No focal touch found");
+			goto err_irq_req;
+		}
 	}
 
 	ret = sysfs_create_group(&client->dev.kobj, &fts_attr_group);
@@ -1725,6 +1800,11 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	if (ret) {
 		FTS_ERROR("[FB]Unable to register fb_notifier: %d", ret);
 	}
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+	ts_data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN + FTS_SUSPEND_LEVEL;
+	ts_data->early_suspend.suspend = fts_ts_early_suspend;
+	ts_data->early_suspend.resume = fts_ts_late_resume;
+	register_early_suspend(&ts_data->early_suspend);
 #endif
 	update_hardware_info(TYPE_TOUCH, 3);
 	update_hardware_info(TYPE_TP_MAKER, ts_data->lockdown_info[0] - 0x30);
@@ -1736,7 +1816,8 @@ err_event_wq:
 	if (ts_data->event_wq)
 		destroy_workqueue(ts_data->event_wq);
 err_debugfs_create:
-	debugfs_remove(tp_debugfs);
+	if (tp_debugfs)
+		debugfs_remove(tp_debugfs);
 err_sysfs_create_group:
 	sysfs_remove_group(&client->dev.kobj, &fts_attr_group);
 err_irq_req:
@@ -1807,6 +1888,8 @@ static int fts_ts_remove(struct i2c_client *client)
 #ifdef CONFIG_DRM
 	if (drm_unregister_client(&ts_data->fb_notif))
 		FTS_ERROR("Error occurred while unregistering fb_notifier.");
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+	unregister_early_suspend(&ts_data->early_suspend);
 #endif
 
 	free_irq(client->irq, ts_data);
@@ -1990,7 +2073,6 @@ static const struct dev_pm_ops fts_dev_pm_ops = {
 static void fts_resume_work(struct work_struct *work)
 {
 	struct fts_ts_data *ts;
-
 	ts = container_of(work, struct fts_ts_data, resume_work);
 	fts_ts_resume(&ts->client->dev);
 }
@@ -1998,7 +2080,6 @@ static void fts_resume_work(struct work_struct *work)
 static void fts_suspend_work(struct work_struct *work)
 {
 	struct fts_ts_data *ts;
-
 	ts = container_of(work, struct fts_ts_data, suspend_work);
 	fts_ts_suspend(&ts->client->dev);
 }
